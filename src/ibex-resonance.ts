@@ -246,18 +246,47 @@ void main() {
   float gr = smoothstep(0.45, 0.95, aWide) * exp(-d / 0.9) * smoothstep(0.0, 0.05, d) * uRays
              * (1.0 - hm * 0.85);
 
-  /* --- shear: the picture torn into sideways-slid bands ----------------
-     Two scales of horizontal bands, only some of which move (the coarse
-     noise gates them), inside a field that grows out from the Ibex. */
-  float h1 = uReach * 0.030, h2 = uReach * 0.011;
-  float b1 = floor(px.y / h1), b2 = floor(px.y / h2);
-  float s1 = vnoise(vec2(b1 * 1.7, uR * 3.0 + 5.0)) - 0.5;
-  float s2 = vnoise(vec2(b2 * 3.1, uR * 5.0 + 9.0)) - 0.5;
-  float gate = step(0.42, vnoise(vec2(b1 * 0.9 + 3.0, uR * 2.0)));
+  /* --- fragments: refracted wavelets carried outward -------------------
+     Two scales of cells on a polar lattice around the origin, each holding
+     at most one soft, noise-broken oval whose long axis points along the
+     beam, with its own size, offset, presence and slide. The lattice
+     travels outward with scroll, so the pieces propagate with the light
+     and retreat with it. Inside a piece the picture is displaced sideways-
+     and-outward: the pieces ARE the image, refracted - never a shape drawn
+     over it. */
+  float theta = atan(dv.y, dv.x);
+  float rrad = d - uR * 0.45;
+  float fragAmt = 0.0;
+  for (int sI = 0; sI < 3; sI++) {
+    float na = sI == 0 ? 8.0 : (sI == 1 ? 14.0 : 28.0);   // cells around
+    float cr = sI == 0 ? 0.20 : (sI == 1 ? 0.10 : 0.05);  // radial cell size, in reach
+    float ca = mod(floor((theta / 6.2831853 + 0.5) * na), na);
+    float cR = floor(rrad / cr);
+    vec2 id = vec2(ca, cR) + float(sI) * 37.0;
+    float h1 = hash(id + 0.13), h2 = hash(id + 0.29), h3 = hash(id + 0.47),
+          h4 = hash(id + 0.61), h5 = hash(id + 0.83);
+    float aC = (ca + 0.5 + (h2 - 0.5) * 0.7) / na * 6.2831853 - 3.14159265;
+    float rC = (cR + 0.5 + (h3 - 0.5) * 0.6) * cr;
+    float dth = theta - aC;
+    dth -= 6.2831853 * floor(dth / 6.2831853 + 0.5);
+    float du = rrad - rC;
+    float dvv = max(rC + uR * 0.45, 0.02) * dth;
+    float ru = cr * mix(0.45, 1.15, h4);   // half-length along the beam
+    float rv = cr * mix(0.14, 0.42, h5);   // half-width across it
+    float e = (du * du) / (ru * ru) + (dvv * dvv) / (rv * rv);
+    e += (vnoise(px / (uReach * 0.02) + id) - 0.5) * 0.7;
+    float m = smoothstep(1.0, 0.45, e) * step(0.30, h1);
+    fragAmt += m * (h2 - 0.5) * 2.0;
+  }
+  /* A whisper of horizontal striation inside each piece, so the refracted
+     texture keeps the character of the earlier bands. */
+  float bandTex = 0.7 + 0.6 * (vnoise(vec2(floor(px.y / (uReach * 0.011)) * 3.1, uR * 5.0 + 9.0)) - 0.5);
   float rf = mix(0.10, 1.3, uShear);
   float field = exp(-(dq * dq) / (2.0 * rf * rf));
-  float shearPx = (s1 * 1.0 + s2 * 0.55) * gate * field * uShear * uReach * 0.065
-                  * (1.0 - hm * 0.85);
+  vec2 shearDir = normalize(mix(dir, vec2(sign(dir.x + 1e-3), 0.0), 0.45) + vec2(1e-4, 0.0));
+  vec2 shearV = shearDir * clamp(fragAmt, -1.2, 1.2) * bandTex * field * uShear * uReach * 0.062
+                * (1.0 - hm * 0.85);
+  float shearMag = length(shearV);
 
   /* --- displacement ----------------------------------------------------
      Lens pull toward the Ibex at the front and the gathering core, push
@@ -265,11 +294,11 @@ void main() {
   float amp = 0.022 * uReach;
   vec2 pull = -dirF * refr * amp;
   vec2 filDisp = dir * fil * 0.9 * amp;
-  vec2 base = px + pull + filDisp + vec2(shearPx, 0.0);
+  vec2 base = px + pull + filDisp + shearV;
 
   /* Dispersion strength: where light passes, the picture spreads into a
      spectrum along a flowing, mostly-horizontal axis. */
-  float disp = 0.22 * refr + seed * 0.6 + fil * 0.5 + abs(shearPx) / (uReach * 0.02) * 0.12;
+  float disp = 0.22 * refr + seed * 0.6 + fil * 0.5 + shearMag / (uReach * 0.02) * 0.12;
   float chroma = amp * disp;
   vec2 dirD = normalize(dirF * 0.6 + vec2(1.0, 0.15));
 
@@ -313,7 +342,7 @@ void main() {
 
   /* Paint only where something changed; everywhere else the DOM shows. */
   float touched = clamp(seed * 1.4 + fil * 3.0 + halo * 0.6 + gr * 2.0
-                        + abs(shearPx) / 1.5, 0.0, 1.0);
+                        + shearMag / 1.5, 0.0, 1.0);
   float alpha = max(max(kk, refr), touched);
   gl_FragColor = vec4(col, alpha);
 }

@@ -21,6 +21,11 @@
      competing with a second warm accent (design-taste-frontend 4.2). */
   --color-gold: #b8944d;
 
+  /* The shadow inside a recess pressed into the gold paint (the contact
+     form on the painting scene): a deep umber, used translucently so the
+     metal darkens where the surface dips. */
+  --color-umber: #2b1c0c;
+
   /* Deep mineral blue: atmosphere only (night sky, cosmic geometry, marble
      veining). Never used for UI or interactive elements. */
   --color-blue: #26384a;
@@ -211,4 +216,427 @@ body {
   height: 100vh;
   pointer-events: none;
   z-index: 40; /* above both fixed video stages (0, 10), below future chrome (60) */
+}
+
+/* ---------------------------------------------------------------------- */
+/* Contact form on the painting scene (src/paint-form.ts)                 */
+/* ---------------------------------------------------------------------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Fixed layer between the Main Video's stage (10) and the Closing Loop
+   (20). Nothing here is a panel. .paint-form__frame is the video's own
+   displayed rect (cover fit, --vid-* from src/paint-form.ts), so every
+   coordinate below is a fraction of the film frame. .paint-form__surface
+   is clipped to the gold stroke's actual silhouette, traced from the
+   footage at 19.3s: the form exists only where the paint is, ragged upper
+   ridge, notch above the drip and all. Inside, each field is a GROOVE
+   pressed into wet paint - pigment darkens where the surface dips, the
+   upper edge falls into shadow, the lower lip catches the light - and its
+   outline is run through a displacement field so it wobbles like
+   something pressed, not drawn. Per scroll-craft's taste floor: shadows
+   are offset and tinted to the ground, lips catch light, no glows, no
+   glass, no radius scale. The grooves sit a hair off-axis, following the
+   stroke's flow.
+   --f wipes it in along the stroke; --ty/--o/--blur/--sc are the paint's
+   measured rise and the form's dissolve as the camera tilts; --mx1..3 are
+   each groove's own eased answer to the pointer. Pointer events are handed
+   over by the script only while it is fully present and the camera holds. */
+.paint-form {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+  --paint-ink: #f6e8c4;
+  --paint-ink-soft: color-mix(in oklab, #f6e8c4 78%, transparent);
+  --paint-shade: color-mix(in oklab, var(--color-umber) 42%, transparent);
+  --paint-pigment: color-mix(in oklab, var(--color-umber) 15%, transparent);
+  --paint-lip: rgba(255, 240, 206, 0.42);
+  color: var(--paint-ink);
+  font-family: var(--font-body);
+  transform: translateY(var(--ty)) scale(var(--sc));
+  transform-origin: 50% 40%;
+  opacity: var(--o);
+  filter: blur(var(--blur));
+  will-change: transform, opacity, filter;
+}
+
+.paint-form__frame {
+  position: absolute;
+  left: var(--vid-x, 0);
+  top: var(--vid-y, 0);
+  width: var(--vid-w, 100%);
+  height: var(--vid-h, 100%);
+}
+
+/* The stroke's silhouette. Percentages are of the film frame. */
+.paint-form__surface {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  clip-path: polygon(44.58% 30.09%, 45.21% 30.16%, 45.83% 30.61%, 46.46% 30.83%, 47.08% 30.76%, 47.71% 30.53%, 48.33% 30.24%, 48.96% 29.99%, 49.58% 30.09%, 50.21% 30.39%, 50.83% 30.53%, 51.46% 30.83%, 52.08% 31.27%, 52.71% 31.57%, 53.33% 31.64%, 53.96% 31.87%, 54.58% 31.94%, 55.21% 32.09%, 55.83% 32.01%, 56.46% 31.94%, 57.08% 31.50%, 57.71% 31.13%, 58.33% 30.31%, 58.96% 29.35%, 59.58% 29.42%, 60.21% 29.79%, 60.83% 30.09%, 61.46% 29.20%, 62.08% 27.87%, 62.71% 28.01%, 63.33% 28.24%, 63.96% 28.31%, 64.58% 28.68%, 65.21% 29.87%, 65.83% 30.46%, 66.46% 30.46%, 67.08% 30.53%, 67.71% 30.76%, 68.33% 30.83%, 68.96% 30.39%, 69.58% 29.79%, 70.21% 29.87%, 70.83% 30.76%, 71.46% 31.20%, 72.08% 30.76%, 72.71% 30.61%, 73.33% 31.05%, 73.96% 30.98%, 74.58% 30.46%, 75.21% 29.87%, 75.83% 29.35%, 76.46% 29.35%, 77.08% 29.13%, 77.71% 28.83%, 78.33% 27.50%, 78.96% 26.01%, 79.58% 25.35%, 80.21% 25.42%, 80.83% 25.64%, 81.46% 24.68%, 82.08% 23.79%, 82.71% 24.01%, 83.33% 24.98%, 83.96% 26.39%, 84.58% 28.83%, 85.21% 32.53%, 85.83% 34.16%, 86.46% 34.31%, 87.08% 34.90%, 87.71% 35.13%, 88.33% 35.05%, 88.96% 35.20%, 89.58% 35.27%, 89.58% 42.01%, 88.96% 43.76%, 88.33% 48.80%, 87.71% 51.76%, 87.08% 51.91%, 86.46% 52.50%, 85.83% 52.87%, 85.21% 53.76%, 84.58% 55.02%, 83.96% 54.95%, 83.33% 54.73%, 82.71% 54.73%, 82.08% 54.73%, 81.46% 54.73%, 80.83% 54.73%, 80.21% 53.39%, 79.58% 52.50%, 78.96% 53.10%, 78.33% 53.61%, 77.71% 53.61%, 77.08% 53.76%, 76.46% 54.21%, 75.83% 54.43%, 75.21% 54.65%, 74.58% 54.58%, 73.96% 54.13%, 73.33% 53.99%, 72.71% 54.21%, 72.08% 55.39%, 71.46% 52.80%, 70.83% 50.87%, 70.21% 51.24%, 69.58% 51.32%, 68.96% 50.95%, 68.33% 50.65%, 67.71% 51.99%, 67.08% 53.99%, 66.46% 53.99%, 65.83% 53.99%, 65.21% 55.54%, 64.58% 55.99%, 63.96% 53.99%, 63.33% 52.87%, 62.71% 52.28%, 62.08% 52.28%, 61.46% 52.36%, 60.83% 52.43%, 60.21% 52.50%, 59.58% 52.50%, 58.96% 52.43%, 58.33% 52.21%, 57.71% 52.21%, 57.08% 53.02%, 56.46% 53.61%, 55.83% 53.61%, 55.21% 53.54%, 54.58% 52.21%, 53.96% 51.24%, 53.33% 51.02%, 52.71% 51.02%, 52.08% 50.21%, 51.46% 48.99%, 50.83% 50.21%, 50.21% 51.24%, 49.58% 51.44%, 48.96% 51.54%, 48.33% 51.69%, 47.71% 51.80%, 47.08% 51.87%, 46.46% 51.84%, 45.83% 51.76%, 45.21% 52.58%, 44.58% 53.37%);
+  /* Wiped in from left to right along the band. The front runs across the
+     silhouette's own span (frame x 42% -> 100%, silhouette 44.6% -> 89.6%)
+     with an 8% soft edge, so the whole reveal window is spent on the
+     paint rather than on empty frame to its left. */
+  -webkit-mask-image: linear-gradient(90deg, #000 calc((0.42 + var(--f) * 0.58) * 100% - 8%), transparent calc((0.42 + var(--f) * 0.58) * 100%));
+  mask-image: linear-gradient(90deg, #000 calc((0.42 + var(--f) * 0.58) * 100% - 8%), transparent calc((0.42 + var(--f) * 0.58) * 100%));
+}
+
+.paint-form__grooves {
+  position: absolute;
+  inset: 0;
+}
+
+/* One groove. Position and a slight tilt per field, in frame fractions,
+   inside the traced silhouette and following the stroke's drift. */
+.paint-form__field {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 1.4em;
+  color: var(--paint-ink);
+  isolation: isolate;
+  will-change: transform;
+}
+.paint-form__field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--paint-pigment);
+  border-radius: 16px 9px 13px 11px / 10px 14px 8px 15px;
+  box-shadow:
+    inset 0 2px 3px var(--paint-shade),
+    inset 1px 0 1px color-mix(in oklab, var(--color-umber) 22%, transparent),
+    inset 0 -1px 0 var(--paint-lip),
+    0 1px 0 rgba(255, 238, 200, 0.18);
+  filter: url(#paint-grooves);
+  transition: background-color 260ms var(--ease-physical);
+}
+.paint-form__field:focus-within::before {
+  background: color-mix(in oklab, var(--color-umber) 24%, transparent);
+}
+/* A field that fails validation is pressed harder, not outlined in red:
+   deeper pigment, a heavier shadow on the upper edge. Cleared on input. */
+.paint-form__field.is-invalid::before {
+  background: color-mix(in oklab, var(--color-umber) 36%, transparent);
+  box-shadow:
+    inset 0 3px 4px color-mix(in oklab, var(--color-umber) 60%, transparent),
+    inset 1px 0 1px color-mix(in oklab, var(--color-umber) 30%, transparent),
+    inset 0 -1px 0 var(--paint-lip),
+    0 1px 0 rgba(255, 238, 200, 0.18);
+}
+.paint-form__field.is-invalid input::placeholder,
+.paint-form__field.is-invalid textarea::placeholder {
+  color: var(--paint-ink);
+}
+
+/* Each groove answers the pointer on its own: its own eased value from the
+   script (--mx1/--mx2/--mx3), its own reach and its own lean, so the three
+   read as three separate dips in one wet surface rather than one plate. The
+   name is the quickest and reaches furthest; the message is the slowest and
+   softest; the button borrows the email's, damped. The silhouette above
+   never moves, so nothing can leave the paint. */
+.paint-form__field--name    { left: 47.6%; top: 33.6%; width: 18.6%; height: 6.4%; transform: translateX(calc(var(--mx1) * 5.5px)) rotate(calc(-0.55deg + var(--mx1) * 0.42deg)); }
+.paint-form__field--email   { left: 67.4%; top: 33.9%; width: 18.2%; height: 6.4%; transform: translateX(calc(var(--mx2) * 4.5px)) rotate(calc(0.4deg + var(--mx2) * 0.34deg)); }
+.paint-form__field--message { left: 47.6%; top: 41.2%; width: 38.0%; height: 6.6%; transform: translateX(calc(var(--mx3) * 4px)) rotate(calc(-0.25deg + var(--mx3) * 0.26deg)); }
+.paint-form__field--message::before { border-radius: 11px 15px 9px 17px / 14px 9px 16px 10px; }
+.paint-form__send           { left: 70.8%; top: 48.6%; width: 14.8%; height: 4.6%; transform: translateX(calc(var(--mx2) * 3px)) rotate(calc(0.3deg + var(--mx2) * 0.22deg)); justify-content: center; }
+.paint-form__send::before {
+  background: color-mix(in oklab, var(--color-umber) 27%, transparent);
+  border-radius: 14px 18px 12px 16px / 9px 11px 10px 12px;
+}
+
+.paint-form__field input,
+.paint-form__field textarea {
+  display: block;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--paint-ink);
+  font: inherit;
+  font-size: clamp(0.85rem, 1.05vw, 1.02rem);
+  font-weight: 300;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+  text-shadow: 0 1px 0 color-mix(in oklab, var(--color-umber) 40%, transparent);
+  caret-color: var(--paint-ink);
+  resize: none;
+  outline: none;
+}
+.paint-form__field input::placeholder,
+.paint-form__field textarea::placeholder {
+  color: var(--paint-ink-soft);
+  opacity: 1;
+}
+/* Selection and autofill in the paint's own colours, never the browser's. */
+.paint-form__field input::selection,
+.paint-form__field textarea::selection {
+  background: color-mix(in oklab, var(--color-umber) 45%, transparent);
+  color: var(--paint-ink);
+}
+.paint-form__field input:-webkit-autofill {
+  -webkit-text-fill-color: var(--paint-ink);
+  transition: background-color 0s 2147483647s;
+}
+.paint-form__surface[data-state="sent"] input,
+.paint-form__surface[data-state="sent"] textarea {
+  color: var(--paint-ink-soft);
+}
+.paint-form__field--message textarea {
+  height: 100%;
+  padding-top: 0.5em;
+  line-height: 1.3;
+}
+
+.paint-form__send {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: clamp(0.6rem, 0.74vw, 0.7rem);
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 color-mix(in oklab, var(--color-umber) 45%, transparent);
+  transition: letter-spacing 360ms var(--ease-physical);
+}
+.paint-form__send span {
+  display: inline-block;
+  margin-left: 0.7em;
+  transition: transform 360ms var(--ease-physical);
+}
+.paint-form__send:hover,
+.paint-form__send:focus-visible {
+  letter-spacing: 0.34em;
+  outline: none;
+}
+.paint-form__send:hover::before,
+.paint-form__send:focus-visible::before {
+  background: color-mix(in oklab, var(--color-umber) 34%, transparent);
+}
+.paint-form__send:hover span {
+  transform: translateX(0.25em);
+}
+/* Sent: the button settles back into the paint and stops answering. */
+.paint-form__send[disabled] {
+  cursor: default;
+  letter-spacing: 0.3em;
+}
+.paint-form__send[disabled]::before {
+  background: color-mix(in oklab, var(--color-umber) 18%, transparent);
+}
+
+@media (max-width: 860px) {
+  /* Narrow frames crop the band's ends; keep the grooves in the visible middle. */
+  .paint-form__field--name    { left: 47.6%; width: 18.6%; }
+  .paint-form__field--email   { left: 67.4%; width: 18.2%; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Closing Loop (played, looping; revealed by src/closing-wave.ts)        */
+/* ---------------------------------------------------------------------- */
+
+.closing-loop {
+  /* Third fixed layer in the same viewport stack: above the Main Video's
+     stage (10), below both effect canvases. No background of its own - an
+     opaque ground on a layer that spends most of the page at opacity 0 is
+     exactly the occluder the .main-video section once was. Opacity is
+     owned by src/closing-wave.ts and only ever swaps: the reveal itself is
+     painted on the canvas above. */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 20;
+  opacity: 0;
+  will-change: opacity;
+  /* Invisible for most of the page but still a full-viewport layer above
+     the contact form (15): at opacity 0 it would otherwise swallow every
+     pointer event meant for the form. It has nothing to click. */
+  pointer-events: none;
+}
+
+.closing-loop__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Reserves the scroll distance the Main -> Closing wave and the closing
+   idle occupy, in normal flow, after the Main Video act. Transparent.
+   The document can only scroll to (its height - one viewport), so the
+   first viewport of this spacer merely lets the scroll reach the act's
+   end; the remaining 1.2vh is what the wave's tail (0.51vh), the breath,
+   the editorial emergence (0.66-1.06vh) and the final hold scroll through. */
+.closing-loop__spacer {
+  height: 220dvh;
+}
+
+#closing-wave {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 41; /* above .closing-loop (20); never draws at the same scroll as #ibex-resonance */
+}
+
+/* ---------------------------------------------------------------------- */
+/* Closing editorial layer                                                */
+/* ---------------------------------------------------------------------- */
+
+/* Composed against the Closing frame itself: the name over the dark sky
+   at left, resting on a hairline that crosses the whole frame just above
+   the horizon; the disciplines beneath it; the location metadata right-
+   aligned to a vertical hairline that stands just before the figure, also
+   resting on the rule; a small gold mark where the two rules meet. Asymmetric,
+   quiet, nothing rounded, nothing boxed. Every element's appearance is a
+   linear function of --e (0..1, published by src/closing-wave.ts from the
+   scroll position), staggered by offset, so it is reversible and, at the
+   page's end, perfectly still. */
+.closing-editorial {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  --rule-y: 52%;
+  --rule-x: 71%;
+  --gutter: clamp(1.25rem, 6vw, 5rem);
+  --k-name: clamp(0, calc(var(--e) / 0.55), 1);
+  --k-rule: clamp(0, calc((var(--e) - 0.15) / 0.55), 1);
+  --k-disc: clamp(0, calc((var(--e) - 0.3) / 0.55), 1);
+  --k-line: clamp(0, calc((var(--e) - 0.42) / 0.55), 1);
+}
+
+.closing-editorial__rule {
+  position: absolute;
+  background: color-mix(in oklab, var(--color-ink) 42%, transparent);
+  opacity: var(--k-rule);
+}
+.closing-editorial__rule--h {
+  left: var(--gutter);
+  right: var(--gutter);
+  top: var(--rule-y);
+  height: 1px;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--k-rule));
+}
+.closing-editorial__rule--v {
+  top: 9%;
+  bottom: 9%;
+  left: var(--rule-x);
+  width: 1px;
+  transform-origin: 50% 0;
+  transform: scaleY(var(--k-rule));
+}
+
+.closing-editorial__mark {
+  position: absolute;
+  left: var(--rule-x);
+  top: var(--rule-y);
+  width: 11px;
+  height: 11px;
+  translate: -50% -50%;
+  background: var(--color-gold);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  opacity: var(--k-rule);
+}
+
+.closing-editorial__name {
+  position: absolute;
+  left: var(--gutter);
+  bottom: calc(100% - var(--rule-y) + 0.55em);
+  margin: 0;
+  font-size: clamp(2rem, 4.4vw, 4.6rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: var(--tracking-wordmark);
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-ink) 92%, transparent);
+  opacity: var(--k-name);
+  transform: translateY(calc((1 - var(--k-name)) * 10px));
+}
+
+.closing-editorial__disciplines {
+  position: absolute;
+  left: var(--gutter);
+  top: calc(var(--rule-y) + 1.1rem);
+  margin: 0;
+  display: flex;
+  gap: 1.4rem;
+  font-size: clamp(0.62rem, 0.8vw, 0.74rem);
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  opacity: var(--k-disc);
+  transform: translateY(calc((1 - var(--k-disc)) * 8px));
+}
+.closing-editorial__disciplines span + span::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 0.9em;
+  margin-right: 1.4rem;
+  vertical-align: -0.12em;
+  background: color-mix(in oklab, var(--color-ink) 35%, transparent);
+}
+
+/* Location as small editorial metadata, right-aligned to the vertical
+   hairline and resting on the rule: a wide-tracked label over tabular
+   coordinates. Deliberately smaller and quieter than the disciplines. */
+.closing-editorial__place {
+  position: absolute;
+  right: calc(100% - var(--rule-x) + 1.1rem);
+  bottom: calc(100% - var(--rule-y) + 0.9rem);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+  text-align: right;
+  opacity: var(--k-line);
+  transform: translateY(calc((1 - var(--k-line)) * 8px));
+}
+.closing-editorial__place-label {
+  font-size: clamp(0.62rem, 0.8vw, 0.74rem);
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+.closing-editorial__place-coords {
+  font-size: clamp(0.6rem, 0.74vw, 0.68rem);
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--color-ink) 62%, transparent);
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  /* Narrow frames: the figure fills the right half, so the vertical rule
+     and the metadata move in and the name yields to the image. */
+  .closing-editorial { --rule-x: 62%; --rule-y: 56%; }
 }

@@ -1,5 +1,15 @@
 <!doctype html>
-<html lang="en">
+<!--
+  data-sc-lerp: scroll-craft's one global pacing control (src/engine/
+  scrollcraft.js, THE PLAYHEAD). Scroll only ever sets the Main Video's
+  target time; a rAF loop walks the playhead toward it by this fraction per
+  frame. 0.18 is the engine default; 0.15 lets each wheel step settle over
+  ~20% more frames (95% of the way in ~18 frames instead of ~15), so the
+  footage answers the hand a little more heavily, without changing the
+  scroll-to-time mapping, the span, the encoding, or the duration. The
+  transitions and the contact form stay a direct function of scroll.
+-->
+<html lang="en" data-sc-lerp="0.15">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -90,6 +100,107 @@
           ></video>
         </div>
       </section>
+
+      <!--
+        Contact form on the painting scene (Main Video ~16.0s -> 20.5s). A
+        fixed layer between the Main Video's stage and the Closing Loop,
+        pressed into the gold band the two brushes paint. It is wiped into
+        existence along the stroke as the last brush finishes, holds while
+        the camera holds, then follows the paint's own measured rise as the
+        camera tilts down to the bowl, dissolving as it goes - all as pure
+        functions of scroll progress published by src/paint-form.ts
+        (--f reveal; --ty/--o/--blur/--sc the ride and the dissolve; --mx1..3
+        each groove's own barely-there nudge). The video is untouched.
+
+        No delivery endpoint exists in the project yet: submit validates,
+        shows a sent state, and nothing leaves the page (see src/paint-form.ts).
+      -->
+      <section class="paint-form" aria-label="Contact" style="--f: 0; --ty: 0px; --o: 1; --blur: 0px; --sc: 1; --mx1: 0; --mx2: 0; --mx3: 0">
+        <!--
+          .paint-form__frame is sized to the video's displayed rect (cover
+          fit, --vid-*), so everything inside is expressed in the video's own
+          coordinates. .paint-form__surface is clipped to the gold stroke's
+          actual silhouette, traced from the footage at 19.3s (see
+          src/paint-form.ts and style.css): the form can only exist where
+          the paint is. Each field is a groove pressed into that paint.
+        -->
+        <div class="paint-form__frame">
+          <form class="paint-form__surface" novalidate>
+            <div class="paint-form__grooves">
+              <label class="paint-form__field paint-form__field--name">
+                <span class="sr-only">Your name</span>
+                <input type="text" name="name" placeholder="Your name" autocomplete="name" required />
+              </label>
+              <label class="paint-form__field paint-form__field--email">
+                <span class="sr-only">Your email</span>
+                <input type="email" name="email" placeholder="Your email" autocomplete="email" required />
+              </label>
+              <label class="paint-form__field paint-form__field--message">
+                <span class="sr-only">Your message</span>
+                <textarea name="message" placeholder="Your message..." rows="2" required></textarea>
+              </label>
+              <button type="submit" class="paint-form__field paint-form__send">Send message <span aria-hidden="true">&rarr;</span></button>
+            </div>
+            <p class="paint-form__status sr-only" aria-live="polite"></p>
+          </form>
+        </div>
+        <!-- Wet-paint edge for the grooves: a static displacement field, so
+             their outlines wobble like something pressed into pigment rather
+             than drawn with a ruler. Referenced from style.css. -->
+        <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+          <filter id="paint-grooves" x="-6%" y="-12%" width="112%" height="124%" color-interpolation-filters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.02 0.055" numOctaves="2" seed="7" result="n" />
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </svg>
+      </section>
+
+      <!--
+        Closing Loop: a played, looping video (never scrubbed), on a third
+        fixed layer in the same viewport stack as the Opening Loop and the
+        Main Video's stage. It is revealed through the Main Video's final
+        frame by src/closing-wave.ts as a pure function of scroll progress;
+        the DOM layer itself only swaps to visible once that reveal is
+        complete. The spacer below reserves the scroll distance the wave
+        and the closing idle occupy, exactly like .opening-loop__spacer.
+      -->
+      <section class="closing-loop" aria-label="Closing">
+        <video
+          class="closing-loop__video"
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="auto"
+        >
+          <source src="/media/closing-loop.mp4" type="video/mp4" />
+        </video>
+        <!--
+          Editorial layer over the settled Closing Loop. Real text, not
+          baked into the video (the loop is clean). It emerges only after
+          the Main -> Closing wave has fully finished, keyed to scroll via
+          --e (set by src/closing-wave.ts, 0..1) so it is reversible and
+          settles into a stable composition at the page's end. Content:
+          the name, the three disciplines, and the studio's location as
+          small editorial metadata.
+        -->
+        <div class="closing-editorial" style="--e: 0">
+          <span class="closing-editorial__rule closing-editorial__rule--h" aria-hidden="true"></span>
+          <span class="closing-editorial__rule closing-editorial__rule--v" aria-hidden="true"></span>
+          <span class="closing-editorial__mark" aria-hidden="true"></span>
+          <h2 class="closing-editorial__name">Cuozarsif</h2>
+          <p class="closing-editorial__disciplines">
+            <span>Sculpture</span>
+            <span>Painting</span>
+            <span>Tattoo</span>
+          </p>
+          <p class="closing-editorial__place">
+            <span class="closing-editorial__place-label">Rotterdam based</span>
+            <span class="closing-editorial__place-coords">51.9244° N / 4.4777° E</span>
+          </p>
+        </div>
+      </section>
+      <div class="closing-loop__spacer" aria-hidden="true"></div>
     </main>
     <!--
       Ibex Resonance: the Opening -> Main Video signature transition overlay.
@@ -99,6 +210,10 @@
       prefers-reduced-motion. Never modifies either video asset.
     -->
     <canvas id="ibex-resonance" aria-hidden="true"></canvas>
+    <!-- Main Video -> Closing Loop optical wave (src/closing-wave.ts). Its own
+         canvas so the approved Ibex Resonance program is untouched; the two
+         never draw at the same scroll position. -->
+    <canvas id="closing-wave" aria-hidden="true"></canvas>
     <!-- Vendor, unedited (see src/engine/). Classic script so it runs before
          the deferred module below and window.ScrollCraft exists in time. -->
     <script src="/src/engine/scrollcraft.js"></script>

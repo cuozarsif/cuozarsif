@@ -1,4 +1,6 @@
 import { initIbexResonance } from './ibex-resonance';
+import { initClosingWave } from './closing-wave';
+import { initPaintForm } from './paint-form';
 
 /*
   Pass 2 scope: the Opening Loop -> Main Video handoff and scroll scrubbing.
@@ -52,3 +54,5 @@ reducedMotion.addEventListener('change', (event) => {
 
 window.ScrollCraft?.mount();
 initIbexResonance();
+initClosingWave();
+initPaintForm();
