@@ -1,0 +1,214 @@
+/*
+  Cuozarsif — base visual system.
+
+  Palette is a PROVISIONAL read from the six reference tableaux (bronze Ibex
+  courtyard, marble/chisel, gold paint, gold droplet, tattoo, cosmic olive
+  finale). Per the design-dna skill, hex values must be re-measured with
+  scripts/measure-colors.mjs once the real reference stills are added to the
+  project, then these tokens updated to match exactly.
+*/
+
+:root {
+  color-scheme: dark;
+
+  /* Neutral scale, warm-dark, lightest to darkest use documented per token */
+  --color-bg: #0b0a08; /* near-black courtyard night, not pure #000 */
+  --color-surface: #16130f;
+  --color-ink: #c9bfae; /* primary foreground on dark */
+  --color-ink-soft: #8b8277; /* secondary / quiet text */
+
+  /* Single locked accent: restrained antique gold. Used consistently, never
+     competing with a second warm accent (design-taste-frontend 4.2). */
+  --color-gold: #b8944d;
+
+  /* Deep mineral blue: atmosphere only (night sky, cosmic geometry, marble
+     veining). Never used for UI or interactive elements. */
+  --color-blue: #26384a;
+
+  --radius: 0; /* sharp edges throughout, no rounded-card UI */
+
+  /* Typography: no custom typeface licensed yet for this project. A
+     confident, restrained sans display face is the direction (frontend-design
+     serif discipline: serif is not a default reach here). Using a refined
+     system stack until a real display/body face pairing is chosen and
+     self-hosted. */
+  --font-display: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-body: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+
+  --tracking-wordmark: 0.34em;
+  --ease-physical: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /*
+    scroll-craft token bridge. scrollcraft.css ships its own six brand
+    tokens (--sc-canvas, --sc-ink, --sc-accent, etc.) with a default
+    lime-on-black palette, used internally by the device floor (.sc-stage,
+    .sc-scrim, focus rings, selection, scrollbar). Re-pointing them at our
+    own tokens keeps every engine-owned surface on-brand without editing
+    the vendored engine file itself, per scroll-craft's own theming model.
+  */
+  --sc-canvas: var(--color-bg);
+  --sc-surface: var(--color-surface);
+  --sc-ink: var(--color-ink);
+  --sc-ink-soft: var(--color-ink-soft);
+  --sc-accent: var(--color-gold);
+  --sc-accent-ink: var(--color-bg);
+  --sc-font-display: var(--font-display);
+  --sc-font-text: var(--font-body);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+}
+
+#app {
+  min-height: 100dvh;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Opening Loop                                                           */
+/* ---------------------------------------------------------------------- */
+
+.opening-loop {
+  /* Fixed cinematic stage, not a section the page scrolls past. Real scroll
+     input still happens normally (no overflow:hidden, no scroll-jacking, no
+     preventDefault) - it's consumed by .opening-loop__spacer below instead.
+     Opacity (not display/visibility) is owned entirely by
+     src/ibex-resonance.ts. It is never faded: the Main Video is revealed
+     through a WebGL portal opening from the Ibex on the canvas above, and
+     this layer simply swaps to 0 once that portal has cleared the frame.
+     The two layers never move. */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--color-bg); /* holds the frame color before video paints */
+  z-index: 0; /* below .main-video's stage (10) and the resonance canvas (40) */
+  opacity: 1;
+  will-change: opacity;
+}
+
+/* Reserves the same scroll distance .opening-loop used to occupy in normal
+   flow, now that .opening-loop itself is fixed and out of flow. Height must
+   match .opening-loop exactly (both 100dvh) - see the comment on the
+   spacer element in index.html. */
+.opening-loop__spacer {
+  height: 100dvh;
+}
+
+.opening-loop__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Subtle vignette, matched to the courtyard's own cinematic darkening at the
+   frame edges rather than an added decorative gradient. */
+.opening-loop__vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(11, 10, 8, 0) 55%,
+    rgba(11, 10, 8, 0.55) 100%
+  );
+}
+
+.wordmark {
+  position: absolute;
+  left: clamp(1.25rem, 4vw, 3rem);
+  bottom: clamp(1.25rem, 4vw, 3rem);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(0.7rem, 1vw, 0.95rem);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wordmark);
+  text-transform: uppercase;
+  color: var(--color-ink);
+  opacity: 0.82;
+  line-height: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opening-loop__video {
+    /* Playback is also paused from script; this guards the visual state
+       even if JS is unavailable. */
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Main Video (scroll-scrubbed, scroll-craft "scrub" act)                 */
+/* ---------------------------------------------------------------------- */
+
+.main-video {
+  /* This section is an in-flow block the engine sizes to span x 100vh so
+     scroll-craft can measure its real height/top for the scrub math. It
+     paints ABOVE the fixed .opening-loop (same stacking level, later in
+     tree order), so it must stay transparent: an opaque ground here scrolls
+     through the scene as a hard black edge rising from the bottom during
+     the handoff. The page ground is already carried by body (same token),
+     which also serves the pre-paint and reduced-motion fallbacks. Only its
+     .sc-stage child is redirected below, from sticky to fixed. */
+  background: transparent;
+}
+
+/* scroll-craft's own device floor pins .sc-stage via `position: sticky`,
+   which is the right mechanism for a stage that is meant to slide up into
+   place - not for one that must already occupy the same fixed viewport
+   rect as .opening-loop from first paint. This override redirects it to
+   `fixed`, matching .opening-loop exactly, so neither video layer ever
+   travels. It stays at opacity 0 for the whole handoff - the reveal is
+   painted by src/ibex-resonance.ts's portal shader on the canvas above -
+   and swaps to 1 only once that portal already covers the viewport.
+
+   scroll-craft's layout() checks that every pinned stage computes
+   position:sticky and warns in the console if something overrides it - this
+   rule is exactly that override, so the warning is expected and inert, not
+   a bug. Deliberately not "fixed" via editing scrollcraft.css itself (the
+   vendored engine stays unmodified); this wins on selector specificity
+   alone. */
+.main-video [data-sc-stage] {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  z-index: 10; /* above .opening-loop (0), below the resonance canvas (40) */
+  opacity: 0;
+  will-change: opacity;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Ibex Resonance (Opening -> Main Video transition overlay)              */
+/* ---------------------------------------------------------------------- */
+
+#ibex-resonance {
+  /* WebGL context (see src/ibex-resonance.ts): samples both video elements
+     live as textures and renders a localized refraction/chromatic-
+     displacement distortion anchored at the Ibex, on top of the plain
+     opacity crossfade between .opening-loop and .main-video's stage below
+     it. Transparent everywhere outside that effect's small radius. */
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 40; /* above both fixed video stages (0, 10), below future chrome (60) */
+}

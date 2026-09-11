@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Cuozarsif</title>
+    <meta
+      name="description"
+      content="Cuozarsif — sculpture, gilding, and tattoo, held in one cinematic passage."
+    />
+    <!-- scroll-craft engine floor, loaded before the brand stylesheet so our
+         tokens (in style.css) win the cascade for any shared property. -->
+    <link rel="stylesheet" href="/src/engine/scrollcraft.css" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section class="opening-loop" aria-label="Opening">
+        <video
+          class="opening-loop__video"
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="auto"
+        >
+          <source src="/media/opening-loop.mp4" type="video/mp4" />
+        </video>
+        <div class="opening-loop__vignette" aria-hidden="true"></div>
+        <h1 class="wordmark">Cuozarsif</h1>
+      </section>
+
+      <!--
+        Reserves the Opening Loop's scroll distance in normal document flow.
+        .opening-loop itself is position:fixed (see style.css) so it renders
+        as a pinned stage rather than scrolling away; this empty spacer is
+        what the browser actually scrolls through instead. Its height must
+        stay in lockstep with .opening-loop's own height (both 100dvh) so
+        the Main Video act's measured top (and every scroll-position
+        constant in src/ibex-resonance.ts, which reads that same act.top)
+        keeps meaning exactly what it already means - real scroll input
+        still drives everything, only the visible stage stops tracking it.
+      -->
+      <div class="opening-loop__spacer" aria-hidden="true"></div>
+
+      <!--
+        Main Video: the 32.7s cinematic sequence, scroll-scrubbed via scroll-craft.
+        Duration is read from the video element at runtime (scrollcraft.js reads
+        video.duration directly, see V.cur * dur in its tick() function), so
+        scroll progress 0..1 always spans the actual clip length. Nothing here
+        assumes or hardcodes 30s; this is not tied to the original 30s plan.
+
+        data-sc-clip-map="travel" is a deliberate departure from scroll-craft's
+        own default (full-life clip mapping). The default starts advancing the
+        clip's target time as soon as this section begins entering the
+        viewport, which would show the video already a few seconds into its
+        timeline the instant it becomes visible: it would not read as an exact
+        0:00 handoff from the Opening Loop above. "travel" mapping instead
+        holds the clip at frame 0 until the stage is fully pinned (scroll
+        progress p = 0 at that exact instant), then maps scroll linearly onto
+        currentTime for the rest of the act. That gives the precise, literal
+        "scroll position -> video.currentTime" behavior this pass asked for,
+        at the cost of the entry-slide smoothing scroll-craft recommends by
+        default (not needed here: the Opening Loop above already occupies
+        that same slide, and its matching composition is what makes the
+        held frame-0 read as continuous rather than frozen).
+
+        data-sc-dwell is intentionally omitted for the same reason: it would
+        nonlinearly remap scroll progress onto video time, which contradicts
+        "scroll DOWN moves the video forward, scroll UP moves it backward" as
+        a direct, predictable relationship.
+
+        No poster image: none was available to derive from the source video
+        in this environment. The stage falls back to the page's own dark
+        background token until the clip paints. See implementation notes.
+      -->
+      <section
+        class="main-video"
+        data-sc-act="scrub"
+        data-sc-span="14"
+        data-sc-clip-map="travel"
+      >
+        <div data-sc-stage>
+          <video
+            data-sc-scrub
+            data-sc-src="/media/main-video-g8.mp4"
+            playsinline
+            muted
+          ></video>
+        </div>
+      </section>
+    </main>
+    <!--
+      Ibex Resonance: the Opening -> Main Video signature transition overlay.
+      Fixed, pointer-events:none, sits above both video stages. Its content is
+      a pure function of scroll progress (see src/ibex-resonance.ts) and is
+      fully inert outside the short handoff window and under
+      prefers-reduced-motion. Never modifies either video asset.
+    -->
+    <canvas id="ibex-resonance" aria-hidden="true"></canvas>
+    <!-- Vendor, unedited (see src/engine/). Classic script so it runs before
+         the deferred module below and window.ScrollCraft exists in time. -->
+    <script src="/src/engine/scrollcraft.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
