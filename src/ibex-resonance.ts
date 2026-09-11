@@ -54,7 +54,10 @@ const RESOLVE_VH = 0.5;
 // Ibex (a small lens, nothing revealed). From OPEN_START the front leaves
 // the Ibex and reaches the farthest viewport corner by OPEN_END, after
 // which the DOM swap happens. Everything is reversible by construction.
-const OPEN_START = 0.3;
+// OPEN_START sits just after the first clear filaments (R ~0.15), so the
+// source can begin exhausting into a Main-Video-revealing opening while the
+// outer beams are still building.
+const OPEN_START = 0.18;
 const OPEN_END = 0.9;
 // The front is measured in units of "reach" (distance from the Ibex to the
 // farthest corner). It overshoots 1 so the noise and the soft edge are
@@ -104,10 +107,12 @@ void main() {
 // Screen-space distance from the Ibex, normalised by the farthest corner so
 // front = 1 always clears the frame at any viewport size. The front is
 // broken by two octaves of value noise (drifting with scroll, never time)
-// so it reads as an organic opening, not a drawn circle. Sampling is
-// displaced toward the Ibex in a band hugging the front, and split per
-// colour channel there: that is where the refraction and the spectral
-// fringing come from - the footage itself, resampled, not a painted tint.
+// so it reads as an organic opening, not a drawn circle. Everything the
+// light does to the picture is done by moving WHERE the footage is
+// sampled: a lens pull at the front, a push along fine filaments, a
+// sideways slide in torn horizontal bands, and a six-tap spectral spread
+// whose weights sum to white. Nothing is a painted tint; where no
+// displacement occurs the taps coincide and the image is untouched.
 const FRAG_SRC = `
 precision highp float;
 uniform sampler2D uTexA;
@@ -122,6 +127,11 @@ uniform float uGather;
 uniform float uR;
 uniform float uBReady;
 uniform vec2 uShiftB;
+uniform float uSeed;
+uniform float uFil;
+uniform float uFilLen;
+uniform float uShear;
+uniform float uRays;
 
 vec2 coverUV(vec2 screenPx, vec2 intrinsic) {
   float scale = max(uResolution.x / intrinsic.x, uResolution.y / intrinsic.y);
@@ -138,12 +148,28 @@ float vnoise(vec2 x) {
   return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
 
+/* Wavelength -> colour, t = 0 violet .. 1 red. Used only as per-tap weights
+   for sampling the footage at dispersed positions; the sum of the weights is
+   normalised back to white, so where the taps coincide the image is
+   untouched, and where they spread the spectrum is the picture itself. */
+vec3 spectral(float t) {
+  return vec3(
+    smoothstep(0.5, 0.82, t) + 0.30 * (1.0 - smoothstep(0.0, 0.22, t)),
+    smoothstep(0.16, 0.42, t) * (1.0 - smoothstep(0.62, 0.94, t)),
+    1.0 - smoothstep(0.34, 0.60, t)
+  );
+}
+
 void main() {
   vec2 px = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y);
   vec2 dv = px - uAnchorPx;
   float dist = length(dv);
   vec2 dir = dist > 0.5 ? dv / dist : vec2(0.0, 0.0);
   float d = dist / uReach;
+  /* Anisotropic distance for the early phenomenon: the seed lies along the
+     surface, wider than it is tall. */
+  vec2 q = dv / uReach; q.x *= 0.5;
+  float dq = length(q);
 
   /* The front's raggedness scales with the aperture, so it is organically
      broken at every size rather than a clean circle that only frays once it
@@ -173,12 +199,79 @@ void main() {
   );
   vec2 dirF = normalize(dir + flow * 9.0 + vec2(1e-4, 0.0));
 
+  /* --- the hollow: the source exhausts itself --------------------------
+     Once the beams have left the Ibex, a second noise-broken radius grows
+     behind the front (always inside it). Inside it the source terms are
+     gone and the filaments start from its edge instead of the centre: the
+     light has moved outward, so the centre empties into a clear optical
+     opening, and the Main Video shows through it while the outer beams
+     and refraction are still at full strength. Same noise as the front, so
+     it is the same organic language, never a drawn circle. */
+  float rh = max(uFront - 0.06, 0.0) * 0.72;
+  /* Soft-edged and only weakly clearing while small, so the source dims
+     into clarity instead of a dark hole being punched into bright light. */
+  float wh = mix(0.13, 0.06, smoothstep(0.0, 0.3, rh));
+  float hm = smoothstep(-wh, wh, rh - (d + n * 0.8)) * smoothstep(0.0, 0.16, rh);
+  float src = 1.0 - hm;
+  core *= src;
+  refr = max(band, core);
+
+  /* --- the seed: a small spectral disturbance embedded in the bronze ----
+     Present from the first scroll movement. It is not a tint: it is a
+     region where the dispersion below is strong relative to its size, so
+     the surface itself smears into a spectrum, plus a little light. */
+  float rs = mix(0.022, 0.10, smoothstep(0.02, 0.45, uR));
+  float seed = exp(-(dq * dq) / (2.0 * rs * rs)) * uSeed * src;
+  float halo = exp(-(dq * dq) / (2.0 * rs * rs * 5.0)) * uSeed * src;
+
+  /* --- filaments: fine rays of light leaving the Ibex ------------------
+     Angular noise sampled on the unit circle (so it is continuous all the
+     way round), sharpened into thin beams with soft cores, fading along
+     their length. They carry light AND displace the picture along their
+     direction, so they read as refraction rather than as drawn lines. */
+  vec2 ang = vec2(dir.x, dir.y);
+  float aFine = vnoise(ang * 11.0 + vec2(uR * 0.6, 7.3));
+  float aHair = vnoise(ang * 31.0 - vec2(uR * 0.9, 2.1));
+  float rayN = max(aFine * 0.70 + aHair * 0.40 - 0.40, 0.0);
+  float rays = pow(rayN * 2.4, 2.6);
+  /* Beams are emitted from the hollow's edge (the centre itself while the
+     hollow is still closed) and fade outward from there. */
+  float dh = d + n * 0.8 - rh;
+  float along = smoothstep(-0.02, 0.03, dh) * exp(-max(dh, 0.0) / max(uFilLen, 0.001));
+  float sparkle = 0.55 + 0.45 * vnoise(px / (uReach * 0.018) + uR * 3.0);
+  float fil = clamp(rays * along * sparkle, 0.0, 1.0) * uFil;
+
+  /* --- god-rays: the same idea, broad and dim, for the strong stage ---- */
+  float aWide = vnoise(ang * 3.2 + vec2(uR * 0.35, 11.0));
+  float gr = smoothstep(0.45, 0.95, aWide) * exp(-d / 0.9) * smoothstep(0.0, 0.05, d) * uRays
+             * (1.0 - hm * 0.85);
+
+  /* --- shear: the picture torn into sideways-slid bands ----------------
+     Two scales of horizontal bands, only some of which move (the coarse
+     noise gates them), inside a field that grows out from the Ibex. */
+  float h1 = uReach * 0.030, h2 = uReach * 0.011;
+  float b1 = floor(px.y / h1), b2 = floor(px.y / h2);
+  float s1 = vnoise(vec2(b1 * 1.7, uR * 3.0 + 5.0)) - 0.5;
+  float s2 = vnoise(vec2(b2 * 3.1, uR * 5.0 + 9.0)) - 0.5;
+  float gate = step(0.42, vnoise(vec2(b1 * 0.9 + 3.0, uR * 2.0)));
+  float rf = mix(0.10, 1.3, uShear);
+  float field = exp(-(dq * dq) / (2.0 * rf * rf));
+  float shearPx = (s1 * 1.0 + s2 * 0.55) * gate * field * uShear * uReach * 0.065
+                  * (1.0 - hm * 0.85);
+
+  /* --- displacement ----------------------------------------------------
+     Lens pull toward the Ibex at the front and the gathering core, push
+     outward along the filaments, sideways slide in the shear bands. */
   float amp = 0.022 * uReach;
   vec2 pull = -dirF * refr * amp;
-  float chroma = 0.22 * amp * refr;
-  vec2 offR = pull + dirF * chroma;
-  vec2 offG = pull;
-  vec2 offB = pull - dirF * chroma;
+  vec2 filDisp = dir * fil * 0.9 * amp;
+  vec2 base = px + pull + filDisp + vec2(shearPx, 0.0);
+
+  /* Dispersion strength: where light passes, the picture spreads into a
+     spectrum along a flowing, mostly-horizontal axis. */
+  float disp = 0.22 * refr + seed * 0.6 + fil * 0.5 + abs(shearPx) / (uReach * 0.02) * 0.12;
+  float chroma = amp * disp;
+  vec2 dirD = normalize(dirF * 0.6 + vec2(1.0, 0.15));
 
   /* The Main Video is drawn through the opening translated so its Ibex
      lands on the Opening Loop's Ibex while the aperture is small, easing to
@@ -189,26 +282,39 @@ void main() {
      continuous refraction, never a step. */
   vec2 shA = uShiftB * (k * 0.5);
   vec2 shB = uShiftB * (1.0 - (1.0 - k) * 0.5);
-  vec3 colA = vec3(
-    texture2D(uTexA, coverUV(px + offR + shA, uIntrinsicA)).r,
-    texture2D(uTexA, coverUV(px + offG + shA, uIntrinsicA)).g,
-    texture2D(uTexA, coverUV(px + offB + shA, uIntrinsicA)).b
-  );
-  vec3 colB = vec3(
-    texture2D(uTexB, coverUV(px + offR + shB, uIntrinsicB)).r,
-    texture2D(uTexB, coverUV(px + offG + shB, uIntrinsicB)).g,
-    texture2D(uTexB, coverUV(px + offB + shB, uIntrinsicB)).b
-  );
+
+  /* Ten spectral taps along the dispersion axis, weights normalised to
+     white: no spread = the exact image, spread = the image as a continuous
+     rainbow rather than a handful of coloured copies. */
+  vec3 accA = vec3(0.0), accB = vec3(0.0), wsum = vec3(0.0);
+  for (int i = 0; i < 10; i++) {
+    float t = (float(i) + 0.5) / 10.0;
+    vec3 wgt = spectral(t);
+    vec2 tap = base + dirD * ((t - 0.5) * 2.0 * chroma);
+    accA += wgt * texture2D(uTexA, coverUV(tap + shA, uIntrinsicA)).rgb;
+    accB += wgt * texture2D(uTexB, coverUV(tap + shB, uIntrinsicB)).rgb;
+    wsum += wgt;
+  }
+  vec3 colA = accA / wsum;
+  vec3 colB = accB / wsum;
   float kk = k * uBReady;
   vec3 col = mix(colA, colB, kk);
 
-  /* A faint luminous crest on the front and a little caught light at the
-     lens: antique gold, low, never a hue wheel. */
+  /* Light. The filaments and seed carry a warm white that leans faintly
+     iridescent with the flow field; the front keeps its antique-gold crest.
+     All additive, all low: the spectrum comes from the taps above, not here. */
   vec3 gold = vec3(0.86, 0.66, 0.36);
+  vec3 warm = vec3(1.0, 0.93, 0.78);
+  vec3 iri = mix(warm, vec3(0.75, 0.92, 1.0), clamp(flow.x * 4.0 + 0.5, 0.0, 1.0));
   col += gold * band * 0.06;
   col += gold * core * 0.05;
+  col += iri * (fil * 0.38 + seed * 0.20 + halo * 0.07);
+  col += warm * gr * 0.10;
 
-  float alpha = max(kk, refr);
+  /* Paint only where something changed; everywhere else the DOM shows. */
+  float touched = clamp(seed * 1.4 + fil * 3.0 + halo * 0.6 + gr * 2.0
+                        + abs(shearPx) / 1.5, 0.0, 1.0);
+  float alpha = max(max(kk, refr), touched);
   gl_FragColor = vec4(col, alpha);
 }
 `;
@@ -355,6 +461,11 @@ export function initIbexResonance(): void {
   const uR = gl.getUniformLocation(program, 'uR');
   const uBReady = gl.getUniformLocation(program, 'uBReady');
   const uShiftB = gl.getUniformLocation(program, 'uShiftB');
+  const uSeed = gl.getUniformLocation(program, 'uSeed');
+  const uFil = gl.getUniformLocation(program, 'uFil');
+  const uFilLen = gl.getUniformLocation(program, 'uFilLen');
+  const uShear = gl.getUniformLocation(program, 'uShear');
+  const uRays = gl.getUniformLocation(program, 'uRays');
 
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -401,8 +512,25 @@ export function initIbexResonance(): void {
     // than popping early and idling until the swap.
     const t = clamp01((R - OPEN_START) / (OPEN_END - OPEN_START));
     const front = FRONT_MAX * t;
-    // Light gathers at the Ibex before the portal, then hands over to it.
-    const gather = smoothstep(0, OPEN_START, R) * (1 - smoothstep(OPEN_START, OPEN_START + 0.25, R));
+    // The phenomenon's stages, each a pure curve of R. The dead zone is
+    // gone: the seed answers the first scroll movement (R 0.02). Every
+    // stage returns to exactly zero before OPEN_END so the last shader frame
+    // still equals the raw Main Video and the swap stays invisible.
+    //   seed   - small spectral disturbance in the bronze, from the start
+    //   gather - the lens core at the Ibex, now earlier and shorter
+    //   fil    - fine luminous filaments, lengthening with scroll
+    //   shear  - the picture torn into sideways bands, peaking mid-open
+    //   rays   - broad dim god-rays for the strong stage only
+    const seed = smoothstep(0.015, 0.10, R) * (1 - smoothstep(0.55, 0.85, R));
+    const gather = smoothstep(0.04, 0.25, R) * (1 - smoothstep(0.30, 0.55, R));
+    // Filaments appear as hairs first; their brightness and length grow
+    // separately from their presence, so the early stage stays tiny.
+    const fil = smoothstep(0.05, 0.30, R) * (1 - smoothstep(0.60, 0.86, R))
+      * lerp(0.25, 1.0, smoothstep(0.12, 0.45, R));
+    const filLen = lerp(0.03, 0.42, smoothstep(0.05, 0.55, R));
+    const shear = smoothstep(0.16, 0.45, R) * (1 - smoothstep(0.62, 0.86, R))
+      * lerp(0.25, 1.0, smoothstep(0.3, 0.55, R));
+    const rays = smoothstep(0.32, 0.58, R) * (1 - smoothstep(0.66, 0.86, R));
 
     const openAnchor = coverPoint(
       w, h, OPENING_INTRINSIC.w, OPENING_INTRINSIC.h,
@@ -412,14 +540,18 @@ export function initIbexResonance(): void {
       w, h, MAIN_INTRINSIC.w, MAIN_INTRINSIC.h,
       MAIN_ANCHOR_FRAC.x, MAIN_ANCHOR_FRAC.y,
     );
-    // The aperture follows the sculpture as the framing changes beneath it:
-    // on the Opening Loop's Ibex while gathering, on the Main Video's once
-    // open. Eased quadratically so most of the re-composition happens while
-    // the aperture is still local to the Ibex, and far landmarks (the moon
-    // ring, the horizon) are already in place by the time it reaches them.
+    // The effect's origin is the Opening Loop's Ibex contact point and it
+    // never moves: every sub-effect (distance field, filaments, hollow,
+    // shear field, dispersion) is measured from here for the whole handoff.
+    // The Main Video's framing still evolves underneath - its translation
+    // (below) eases from "its Ibex on this point" to none - but the portal
+    // itself stays put on screen.
+    const ax = openAnchor.x;
+    const ay = openAnchor.y;
+    // Eased quadratically so most of the re-composition happens while the
+    // aperture is still local to the Ibex, and far landmarks (the moon ring,
+    // the horizon) are already in place by the time it reaches them.
     const te = 1 - (1 - t) * (1 - t);
-    const ax = lerp(openAnchor.x, mainAnchor.x, te);
-    const ay = lerp(openAnchor.y, mainAnchor.y, te);
     const reach = Math.max(
       Math.hypot(ax, ay), Math.hypot(w - ax, ay),
       Math.hypot(ax, h - ay), Math.hypot(w - ax, h - ay),
@@ -447,14 +579,20 @@ export function initIbexResonance(): void {
     gl!.uniform1f(uGather, gather);
     gl!.uniform1f(uR, R);
     gl!.uniform1f(uBReady, texBHasFrame ? 1 : 0);
-    // Sampling offset that puts the Main Video's Ibex on the aperture centre
-    // while it is small (full framing difference), easing to zero as the
-    // portal opens so the fully-open output equals the raw video exactly.
+    // Sampling offset that puts the Main Video's Ibex on the fixed origin
+    // while the aperture is small (full framing difference), easing to zero
+    // as the portal opens so the fully-open output equals the raw video
+    // exactly. This is what lets the framing evolve without the origin moving.
     gl!.uniform2f(
       uShiftB,
-      (mainAnchor.x - ax) * dpr,
-      (mainAnchor.y - ay) * dpr,
+      (mainAnchor.x - openAnchor.x) * (1 - te) * dpr,
+      (mainAnchor.y - openAnchor.y) * (1 - te) * dpr,
     );
+    gl!.uniform1f(uSeed, seed);
+    gl!.uniform1f(uFil, fil);
+    gl!.uniform1f(uFilLen, filLen);
+    gl!.uniform1f(uShear, shear);
+    gl!.uniform1f(uRays, rays);
 
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
   }
