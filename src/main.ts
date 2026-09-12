@@ -33,13 +33,30 @@ import { initPaintForm } from './paint-form';
   is switched to manual and the page is put back at 0 before scroll-craft
   mounts, so every scroll-driven system reads its initial state. 'instant'
   because scrollcraft.css sets scroll-behavior:smooth.
+
+  Setting the mode alone is not enough in Chrome: the page is only a few
+  viewports tall until the engine lays the act out, and Chrome was observed
+  applying the saved position the moment the document grew to hold it,
+  even with the mode already manual, right up to the load event. So 0 is
+  held until load has passed: any scroll before then is put back, then the
+  guard is removed and the reader owns the scroll.
 */
 const navigation = performance.getEntriesByType('navigation')[0] as
   | PerformanceNavigationTiming
   | undefined;
 if (navigation?.type === 'reload' && 'scrollRestoration' in history) {
   history.scrollRestoration = 'manual';
-  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  const toTop = (): void => window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  const hold = (): void => { if (window.scrollY !== 0) toTop(); };
+  toTop();
+  window.addEventListener('scroll', hold, { passive: true });
+  window.addEventListener('load', () => {
+    toTop();
+    requestAnimationFrame(() => {
+      toTop();
+      window.removeEventListener('scroll', hold);
+    });
+  }, { once: true });
 }
 
 const openingVideo = document.querySelector<HTMLVideoElement>(
