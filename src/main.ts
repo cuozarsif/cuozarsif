@@ -1,3 +1,4 @@
+import { inject as injectAnalytics } from '@vercel/analytics';
 import { initIbexResonance } from './ibex-resonance';
 import { initClosingWave } from './closing-wave';
 import { initPaintForm } from './paint-form';
@@ -90,3 +91,8 @@ window.ScrollCraft?.mount();
 initIbexResonance();
 initClosingWave();
 initPaintForm();
+
+// Vercel Web Analytics (page views only, no cookies). inject() adds the
+// /_vercel/insights script that Vercel serves for this project; in a dev
+// session it logs instead of reporting, so local work never counts.
+injectAnalytics({ mode: import.meta.env.DEV ? 'development' : 'production' });
