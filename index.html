@@ -39,6 +39,23 @@
         </video>
         <div class="opening-loop__vignette" aria-hidden="true"></div>
         <h1 class="wordmark">Cuozarsif</h1>
+        <!--
+          The one instruction on the page: the word and a hairline arrow,
+          set in the wordmark's own type on the wordmark's own baseline,
+          after a divider - one editorial line along the bottom gutter, in
+          the frame's dark negative space (the lower centre of the footage
+          is the lit marble step). Its opacity is --cue (src/scroll-cue.ts),
+          a pure function of the first few pixels of scroll, so it is gone
+          before the handoff begins and returns if the reader comes back to
+          the top. Purely visual: hidden from assistive tech, never
+          focusable.
+        -->
+        <p class="scroll-cue" aria-hidden="true">
+          <span class="scroll-cue__word">Scroll</span>
+          <svg class="scroll-cue__arrow" width="8" height="14" viewBox="0 0 8 14" focusable="false">
+            <path d="M4 0v12.5M1 10l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </p>
       </section>
 
       <!--

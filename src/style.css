@@ -152,7 +152,58 @@ body {
   line-height: 1;
 }
 
+/* The scroll cue: "SCROLL" and a hairline arrow in the wordmark's own
+   type, on the wordmark's baseline, after a divider - the line reads
+   CUOZARSIF | SCROLL, in the frame's dark lower-left negative space. The
+   wordmark is 9 tracked capitals (~8.3em of its own size), so the cue
+   starts 9.8em past the gutter; the same size keeps that measure exact.
+   Nothing else is added - no box, no ground, no glow. Opacity is --cue,
+   published by src/scroll-cue.ts from the scroll position (1 at the top,
+   0 after the first few pixels), so it never overlaps the handoff or the
+   Main Video; the arrow breathes down a few pixels, slowly. */
+.scroll-cue {
+  position: absolute;
+  left: calc(clamp(1.25rem, 4vw, 3rem) + 9.8em);
+  bottom: clamp(1.25rem, 4vw, 3rem);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  font-family: var(--font-display);
+  font-size: clamp(0.7rem, 1vw, 0.95rem);
+  font-weight: 400;
+  letter-spacing: var(--tracking-wordmark);
+  text-transform: uppercase;
+  color: var(--color-ink);
+  line-height: 1;
+  white-space: nowrap;
+  opacity: calc(var(--cue, 1) * 0.62);
+  transition: opacity 320ms var(--ease-physical);
+  pointer-events: none;
+  user-select: none;
+}
+/* The divider: the same hairline as between the closing disciplines. */
+.scroll-cue::before {
+  content: "";
+  display: block;
+  width: 1px;
+  height: 1em;
+  margin-right: 1em;
+  background: color-mix(in oklab, var(--color-ink) 45%, transparent);
+}
+.scroll-cue__arrow {
+  display: block;
+  margin-left: 0.1em;
+  animation: scroll-cue-drift 2.8s var(--ease-physical) infinite alternate;
+}
+@keyframes scroll-cue-drift {
+  from { transform: translateY(0); }
+  to { transform: translateY(3px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .scroll-cue { transition: none; }
+  .scroll-cue__arrow { animation: none; }
   .opening-loop__video {
     /* Playback is also paused from script; this guards the visual state
        even if JS is unavailable. */
@@ -507,7 +558,8 @@ body {
      100lvh tall, so the extra lvh - svh is added), so it is on screen from
      the first frame and stays put when the bar goes. Same gutter, same
      type; on a phone with no bar in play the two values coincide. */
-  .wordmark {
+  .wordmark,
+  .scroll-cue {
     bottom: calc(100lvh - 100svh + clamp(1.25rem, 4vw, 3rem));
   }
 }

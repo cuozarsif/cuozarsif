@@ -3,6 +3,7 @@ import { initIbexResonance } from './ibex-resonance';
 import { initClosingWave } from './closing-wave';
 import { initPaintForm } from './paint-form';
 import { initMainFraming } from './framing';
+import { initScrollCue } from './scroll-cue';
 
 /*
   Pass 2 scope: the Opening Loop -> Main Video handoff and scroll scrubbing.
@@ -95,6 +96,7 @@ initMainFraming();
 initIbexResonance();
 initClosingWave();
 initPaintForm();
+initScrollCue();
 
 // Vercel Web Analytics (page views only, no cookies). inject() adds the
 // /_vercel/insights script that Vercel serves for this project; in a dev
