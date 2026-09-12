@@ -375,10 +375,20 @@ export function initIbexResonance(): void {
     return inst?.acts?.[0] ?? null;
   }
 
+  // The viewport height the act was laid out for (act.height / span, i.e.
+  // the engine's own 100vh at layout) rather than the live innerHeight: on
+  // phones the URL bar changes innerHeight by 60-100px while the reader is
+  // scrolling, and the engine deliberately keeps its act geometry through
+  // that, so the handoff window must too or its progress would jump. On
+  // desktop the two are the same number.
+  function stableVh(act: { height: number; span: number }): number {
+    return act.span > 0 ? act.height / act.span : window.innerHeight;
+  }
+
   function currentR(): number {
     const act = getAct();
     if (!act) return 0;
-    const vh = window.innerHeight;
+    const vh = stableVh(act);
     const top = act.top;
     const approachStart = top - APPROACH_VH * vh;
     const resolveEnd = top + RESOLVE_VH * vh;

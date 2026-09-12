@@ -9,6 +9,11 @@ export {};
 interface ScrollCraftAct {
   top: number;
   height: number;
+  // viewport-heights of scroll the act owns (data-sc-span). The engine sizes
+  // a pinned act to span * 100vh at layout, so height / span is the viewport
+  // height the act was laid out for - stable on phones while the URL bar
+  // changes window.innerHeight.
+  span: number;
 }
 
 interface ScrollCraftInstance {

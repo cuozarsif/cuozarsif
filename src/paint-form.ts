@@ -97,6 +97,11 @@ export function initPaintForm(): void {
   function videoTime(): number {
     const act = getAct();
     if (!act) return 0;
+    // Deliberately the live innerHeight, not the act's laid-out viewport:
+    // this must equal the engine's own scroll -> clip-time mapping
+    // (travel = act.height - vh, where the engine refreshes vh on every
+    // resize, including a phone's URL-bar change) or the form would drift
+    // out of register with the footage it is pressed into.
     const travel = Math.max(act.height - window.innerHeight, 1);
     const p = clamp01((window.scrollY - act.top) / travel);
     // The engine reads the clip's real duration at runtime; so do we.

@@ -177,10 +177,18 @@ export function initClosingWave(): void {
     return inst?.acts?.[0] ?? null;
   }
 
+  // The viewport height the act was laid out for (act.height / span, the
+  // engine's own 100vh at layout) rather than the live innerHeight, so the
+  // wave and editorial windows do not jump when a phone's URL bar changes
+  // innerHeight mid-scroll. On desktop the two are the same number.
+  function stableVh(act: { height: number; span: number }): number {
+    return act.span > 0 ? act.height / act.span : window.innerHeight;
+  }
+
   function currentC(): number {
     const act = getAct();
     if (!act) return 0;
-    const vh = window.innerHeight;
+    const vh = stableVh(act);
     const end = act.top + act.height;
     const start = end + WAVE_START_VH * vh;
     const stop = end + WAVE_END_VH * vh;
@@ -192,7 +200,7 @@ export function initClosingWave(): void {
     if (!editorial) return;
     const act = getAct();
     if (!act) return;
-    const vh = window.innerHeight;
+    const vh = stableVh(act);
     const start = act.top + act.height + EDITORIAL_START_VH * vh;
     const e = instant
       ? (window.scrollY >= start ? 1 : 0)
