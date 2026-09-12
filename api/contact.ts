@@ -110,13 +110,16 @@ export async function POST(request: Request): Promise<Response> {
   if (!message) problems.push('message');
   if (problems.length) return json(422, { error: 'invalid_fields', fields: problems });
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.CONTACT_TO_EMAIL;
+  // Pasted secrets sometimes carry a stray newline or quotes; strip them
+  // rather than fail with a 401 that looks like a wrong key.
+  const unquote = (v: string | undefined): string => (v ?? '').trim().replace(/^["']|["']$/g, '').trim();
+  const apiKey = unquote(process.env.RESEND_API_KEY);
+  const to = unquote(process.env.CONTACT_TO_EMAIL);
   if (!apiKey || !to) {
     console.error('[contact] not configured:', !apiKey ? 'RESEND_API_KEY' : 'CONTACT_TO_EMAIL', 'is missing');
     return json(500, { error: 'not_configured' });
   }
-  const from = process.env.CONTACT_FROM_EMAIL || DEFAULT_FROM;
+  const from = unquote(process.env.CONTACT_FROM_EMAIL) || DEFAULT_FROM;
 
   const text =
     `Name: ${name}\n` +
