@@ -386,6 +386,17 @@ body {
   color: var(--paint-ink-soft);
   opacity: 1;
 }
+/* iOS Safari zooms the whole page when a focused field's text is smaller
+   than 16px, which would blow up the fixed cinematic stack. On touch
+   devices (and narrow portrait screens) the fields use 16px; everything
+   else about them - grooves, padding, weight, colour - is unchanged, and
+   desktop keeps its clamp(). Viewport zoom is never restricted. */
+@media (hover: none) and (pointer: coarse), (orientation: portrait) and (max-width: 860px) {
+  .paint-form__field input,
+  .paint-form__field textarea {
+    font-size: 16px;
+  }
+}
 /* Selection and autofill in the paint's own colours, never the browser's. */
 .paint-form__field input::selection,
 .paint-form__field textarea::selection {
