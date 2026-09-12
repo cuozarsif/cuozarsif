@@ -451,6 +451,23 @@ body {
 }
 
 /* ---------------------------------------------------------------------- */
+/* Portrait focus point                                                   */
+/* ---------------------------------------------------------------------- */
+
+/* Narrow portrait screens show only the central quarter of a 16:9 frame
+   under object-fit: cover, which put the Ibex and the gold band off screen.
+   These focus points keep them in view. They are read back by
+   src/ibex-resonance.ts, src/closing-wave.ts and src/paint-form.ts (through
+   src/cover.ts) from the videos' computed object-position, so the portal
+   origin, the shaders' sampling and the form stay in register with what the
+   DOM video shows. Everything wider, or landscape, keeps the default
+   50% 50% and is untouched. */
+@media (orientation: portrait) and (max-width: 860px) {
+  .opening-loop__video { object-position: 70% 50%; }
+  .main-video video[data-sc-scrub] { object-position: 67% 50%; }
+}
+
+/* ---------------------------------------------------------------------- */
 /* Closing Loop (played, looping; revealed by src/closing-wave.ts)        */
 /* ---------------------------------------------------------------------- */
 

@@ -34,6 +34,8 @@
   the framing changes underneath it.
 */
 
+import { CENTER, coverRect, readFocus, type Focus } from './cover';
+
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Measured by eye against captured frames: both fractions target the ibex's
@@ -88,13 +90,10 @@ function coverPoint(
   intrinsicH: number,
   fracX: number,
   fracY: number,
+  focus: Focus,
 ): { x: number; y: number } {
-  const scale = Math.max(vw / intrinsicW, vh / intrinsicH);
-  const dispW = intrinsicW * scale;
-  const dispH = intrinsicH * scale;
-  const offX = (vw - dispW) / 2;
-  const offY = (vh - dispH) / 2;
-  return { x: offX + fracX * dispW, y: offY + fracY * dispH };
+  const c = coverRect(vw, vh, intrinsicW, intrinsicH, focus);
+  return { x: c.offX + fracX * c.dispW, y: c.offY + fracY * c.dispH };
 }
 
 const VERT_SRC = `
@@ -120,6 +119,8 @@ uniform sampler2D uTexB;
 uniform vec2 uResolution;
 uniform vec2 uIntrinsicA;
 uniform vec2 uIntrinsicB;
+uniform vec2 uFocusA;
+uniform vec2 uFocusB;
 uniform vec2 uAnchorPx;
 uniform float uReach;
 uniform float uFront;
@@ -133,10 +134,12 @@ uniform float uFilLen;
 uniform float uShear;
 uniform float uRays;
 
-vec2 coverUV(vec2 screenPx, vec2 intrinsic) {
+/* object-fit: cover at the layer's own object-position (uFocus, 0.5 =
+   centred), so the shader samples exactly what the DOM video shows. */
+vec2 coverUV(vec2 screenPx, vec2 intrinsic, vec2 focus) {
   float scale = max(uResolution.x / intrinsic.x, uResolution.y / intrinsic.y);
   vec2 disp = intrinsic * scale;
-  vec2 off = (uResolution - disp) * 0.5;
+  vec2 off = (uResolution - disp) * focus;
   return (screenPx - off) / disp;
 }
 
@@ -320,8 +323,8 @@ void main() {
     float t = (float(i) + 0.5) / 10.0;
     vec3 wgt = spectral(t);
     vec2 tap = base + dirD * ((t - 0.5) * 2.0 * chroma);
-    accA += wgt * texture2D(uTexA, coverUV(tap + shA, uIntrinsicA)).rgb;
-    accB += wgt * texture2D(uTexB, coverUV(tap + shB, uIntrinsicB)).rgb;
+    accA += wgt * texture2D(uTexA, coverUV(tap + shA, uIntrinsicA, uFocusA)).rgb;
+    accB += wgt * texture2D(uTexB, coverUV(tap + shB, uIntrinsicB, uFocusB)).rgb;
     wsum += wgt;
   }
   vec3 colA = accA / wsum;
@@ -490,6 +493,17 @@ export function initIbexResonance(): void {
   const uR = gl.getUniformLocation(program, 'uR');
   const uBReady = gl.getUniformLocation(program, 'uBReady');
   const uShiftB = gl.getUniformLocation(program, 'uShiftB');
+  const uFocusA = gl.getUniformLocation(program, 'uFocusA');
+  const uFocusB = gl.getUniformLocation(program, 'uFocusB');
+  // Each layer's object-position, read from its computed style (CSS decides;
+  // the default stays the centre). Re-read on resize, which is also where an
+  // orientation change lands.
+  let focusA: Focus = CENTER;
+  let focusB: Focus = CENTER;
+  function readFocusPoints(): void {
+    focusA = readFocus(openingVideo);
+    focusB = readFocus(mainVideo);
+  }
   const uSeed = gl.getUniformLocation(program, 'uSeed');
   const uFil = gl.getUniformLocation(program, 'uFil');
   const uFilLen = gl.getUniformLocation(program, 'uFilLen');
@@ -563,11 +577,11 @@ export function initIbexResonance(): void {
 
     const openAnchor = coverPoint(
       w, h, OPENING_INTRINSIC.w, OPENING_INTRINSIC.h,
-      OPENING_ANCHOR_FRAC.x, OPENING_ANCHOR_FRAC.y,
+      OPENING_ANCHOR_FRAC.x, OPENING_ANCHOR_FRAC.y, focusA,
     );
     const mainAnchor = coverPoint(
       w, h, MAIN_INTRINSIC.w, MAIN_INTRINSIC.h,
-      MAIN_ANCHOR_FRAC.x, MAIN_ANCHOR_FRAC.y,
+      MAIN_ANCHOR_FRAC.x, MAIN_ANCHOR_FRAC.y, focusB,
     );
     // The effect's origin is the Opening Loop's Ibex contact point and it
     // never moves: every sub-effect (distance field, filaments, hollow,
@@ -602,6 +616,8 @@ export function initIbexResonance(): void {
     gl!.uniform2f(uResolution, w * dpr, h * dpr);
     gl!.uniform2f(uIntrinsicA, OPENING_INTRINSIC.w, OPENING_INTRINSIC.h);
     gl!.uniform2f(uIntrinsicB, MAIN_INTRINSIC.w, MAIN_INTRINSIC.h);
+    gl!.uniform2f(uFocusA, focusA.fx, focusA.fy);
+    gl!.uniform2f(uFocusB, focusB.fx, focusB.fy);
     gl!.uniform2f(uAnchorPx, ax * dpr, ay * dpr);
     gl!.uniform1f(uReach, reach * dpr);
     gl!.uniform1f(uFront, front);
@@ -627,6 +643,7 @@ export function initIbexResonance(): void {
   }
 
   function resize(): void {
+    readFocusPoints();
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas!.width = Math.round(window.innerWidth * dpr);
     canvas!.height = Math.round(window.innerHeight * dpr);

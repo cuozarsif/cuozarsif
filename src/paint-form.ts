@@ -23,6 +23,8 @@
   is never touched.
 */
 
+import { CENTER, coverRect, readFocus, type Focus } from './cover';
+
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Video seconds. The form's region of the band is fully painted by ~15.0s
@@ -77,11 +79,8 @@ function bandRise(t: number): number {
   return BAND_RISE[BAND_RISE.length - 1][1];
 }
 
-function cover(vw: number, vh: number) {
-  const scale = Math.max(vw / MAIN_INTRINSIC.w, vh / MAIN_INTRINSIC.h);
-  const dispW = MAIN_INTRINSIC.w * scale;
-  const dispH = MAIN_INTRINSIC.h * scale;
-  return { dispW, dispH, offX: (vw - dispW) / 2, offY: (vh - dispH) / 2 };
+function cover(vw: number, vh: number, focus: Focus) {
+  return coverRect(vw, vh, MAIN_INTRINSIC.w, MAIN_INTRINSIC.h, focus);
 }
 
 export function initPaintForm(): void {
@@ -104,9 +103,18 @@ export function initPaintForm(): void {
     return p * (mainVideo!.duration || 32.633);
   }
 
+  // The video's object-position (CSS sets a focus point on narrow portrait
+  // screens; the default is the centre), re-read on resize so the frame
+  // follows whatever the DOM video shows.
+  let focus: Focus = CENTER;
+  function onResize(): void {
+    focus = readFocus(mainVideo);
+    apply();
+  }
+
   function apply(): void {
     const t = videoTime();
-    const c = cover(window.innerWidth, window.innerHeight);
+    const c = cover(window.innerWidth, window.innerHeight, focus);
 
     let f = clamp01((t - REVEAL_FROM) / (REVEAL_TO - REVEAL_FROM));
     let release = smooth((t - RELEASE_FROM) / (RELEASE_TO - RELEASE_FROM));
@@ -273,6 +281,6 @@ export function initPaintForm(): void {
   }
 
   window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('resize', apply, { passive: true });
-  apply();
+  window.addEventListener('resize', onResize, { passive: true });
+  onResize();
 }

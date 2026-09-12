@@ -24,6 +24,8 @@
   move unless the scroll does.
 */
 
+import { CENTER, readFocus, type Focus } from './cover';
+
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const MAIN_INTRINSIC = { w: 1920, h: 1080 };
@@ -67,13 +69,17 @@ uniform sampler2D uTexB;
 uniform vec2 uResolution;
 uniform vec2 uIntrinsicA;
 uniform vec2 uIntrinsicB;
+uniform vec2 uFocusA;
+uniform vec2 uFocusB;
 uniform float uC;
 uniform float uBReady;
 
-vec2 coverUV(vec2 screenPx, vec2 intrinsic) {
+/* object-fit: cover at the layer's own object-position (uFocus, 0.5 =
+   centred), so the shader samples exactly what the DOM video shows. */
+vec2 coverUV(vec2 screenPx, vec2 intrinsic, vec2 focus) {
   float scale = max(uResolution.x / intrinsic.x, uResolution.y / intrinsic.y);
   vec2 disp = intrinsic * scale;
-  vec2 off = (uResolution - disp) * 0.5;
+  vec2 off = (uResolution - disp) * focus;
   return (screenPx - off) / disp;
 }
 
@@ -125,14 +131,14 @@ void main() {
   vec2 offB = disp - ddir * chroma;
 
   vec3 colA = vec3(
-    texture2D(uTexA, coverUV(px + offR, uIntrinsicA)).r,
-    texture2D(uTexA, coverUV(px + offG, uIntrinsicA)).g,
-    texture2D(uTexA, coverUV(px + offB, uIntrinsicA)).b
+    texture2D(uTexA, coverUV(px + offR, uIntrinsicA, uFocusA)).r,
+    texture2D(uTexA, coverUV(px + offG, uIntrinsicA, uFocusA)).g,
+    texture2D(uTexA, coverUV(px + offB, uIntrinsicA, uFocusA)).b
   );
   vec3 colB = vec3(
-    texture2D(uTexB, coverUV(px + offR, uIntrinsicB)).r,
-    texture2D(uTexB, coverUV(px + offG, uIntrinsicB)).g,
-    texture2D(uTexB, coverUV(px + offB, uIntrinsicB)).b
+    texture2D(uTexB, coverUV(px + offR, uIntrinsicB, uFocusB)).r,
+    texture2D(uTexB, coverUV(px + offG, uIntrinsicB, uFocusB)).g,
+    texture2D(uTexB, coverUV(px + offB, uIntrinsicB, uFocusB)).b
   );
   float kk = k * uBReady;
   vec3 col = mix(colA, colB, kk);
@@ -262,6 +268,15 @@ export function initClosingWave(): void {
   const uIntrinsicB = gl.getUniformLocation(program, 'uIntrinsicB');
   const uC = gl.getUniformLocation(program, 'uC');
   const uBReady = gl.getUniformLocation(program, 'uBReady');
+  const uFocusA = gl.getUniformLocation(program, 'uFocusA');
+  const uFocusB = gl.getUniformLocation(program, 'uFocusB');
+  // Each layer's object-position from its computed style; re-read on resize.
+  let focusA: Focus = CENTER;
+  let focusB: Focus = CENTER;
+  function readFocusPoints(): void {
+    focusA = readFocus(mainVideo);
+    focusB = readFocus(closingVideo);
+  }
 
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -301,6 +316,8 @@ export function initClosingWave(): void {
     gl!.uniform2f(uResolution, w * dpr, h * dpr);
     gl!.uniform2f(uIntrinsicA, MAIN_INTRINSIC.w, MAIN_INTRINSIC.h);
     gl!.uniform2f(uIntrinsicB, CLOSING_INTRINSIC.w, CLOSING_INTRINSIC.h);
+    gl!.uniform2f(uFocusA, focusA.fx, focusA.fy);
+    gl!.uniform2f(uFocusB, focusB.fx, focusB.fy);
     gl!.uniform1f(uC, C);
     gl!.uniform1f(uBReady, texBHasFrame ? 1 : 0);
     gl!.drawArrays(gl!.TRIANGLES, 0, 3);
@@ -419,6 +436,7 @@ export function initClosingWave(): void {
   }
 
   function resize(): void {
+    readFocusPoints();
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas!.width = Math.round(window.innerWidth * dpr);
     canvas!.height = Math.round(window.innerHeight * dpr);
