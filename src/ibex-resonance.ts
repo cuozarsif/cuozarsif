@@ -416,12 +416,28 @@ export function initIbexResonance(): void {
     return 0.5 + 0.5 * ((y - top) / Math.max(resolveEnd - top, 1));
   }
 
+  // From the swap on the Opening Loop is invisible, but a playing <video>
+  // keeps decoding its 60fps 720p behind the Main Video - on the same
+  // hardware decoder every scrub seek has to go through on a phone. It is
+  // paused once the swap has happened and resumed the moment the handoff
+  // region is re-entered from below, so scrolling back always finds it
+  // moving. Nothing visible changes: it is at opacity 0 for the whole hold.
+  const loopVideo = document.querySelector<HTMLVideoElement>('.opening-loop__video');
+  let loopHeld = false;
+  function holdOpeningLoop(hold: boolean): void {
+    if (!loopVideo || hold === loopHeld) return;
+    loopHeld = hold;
+    if (hold) loopVideo.pause();
+    else void loopVideo.play().catch(() => { /* autoplay policy: the frame holds still, as at load */ });
+  }
+
   // The DOM only ever swaps, never fades: the shader carries the whole
   // reveal, and by OPEN_END its output already equals the raw Main Video.
   function applyReveal(R: number): void {
     const revealed = R >= OPEN_END;
     openingLoop!.style.opacity = revealed ? '0' : '1';
     mainStage!.style.opacity = revealed ? '1' : '0';
+    holdOpeningLoop(revealed);
   }
 
   // Fallback-only: plain opacity crossfade when there is no WebGL.
@@ -429,6 +445,7 @@ export function initIbexResonance(): void {
     const mix = smoothstep(CROSSFADE_LO, CROSSFADE_HI, R);
     openingLoop!.style.opacity = String(1 - mix);
     mainStage!.style.opacity = String(mix);
+    holdOpeningLoop(mix >= 1);
   }
 
   // ---- reduced motion: instant, unanimated layer swap, no WebGL, no

@@ -39,6 +39,16 @@ const DEFER_CLOSING = window.matchMedia('(hover: none) and (pointer: coarse), (m
 // through, i.e. ~6.65 viewport-heights (about 16.7s of footage) before the
 // wave begins - several times what the loop needs on a typical mobile link.
 const CLOSING_LOAD_AT = 0.5;
+// The loop is invisible until the wave, and a playing <video> decodes its
+// 60fps 720p the whole time - on a phone, on the same hardware decoder
+// every Main Video seek goes through. So once attached it is held paused
+// and only started CLOSING_PLAY_AT through the act: 1.4 viewport-heights
+// of scroll (a full viewport before the wave can begin, WAVE_START_VH),
+// so its frames are flowing well before the first wave frame samples it.
+// It is held again once the reader has scrolled back below
+// CLOSING_HOLD_BELOW; the gap between the two is hysteresis.
+const CLOSING_PLAY_AT = 0.85;
+const CLOSING_HOLD_BELOW = 0.8;
 
 const MAIN_INTRINSIC = { w: 1920, h: 1080 };
 const CLOSING_INTRINSIC = { w: 1280, h: 720 };
@@ -197,23 +207,47 @@ export function initClosingWave(): void {
   // copes with a loop that is not decoded yet (uBReady, readyState checks).
   const closingSrc = closingVideo.dataset.src ?? '';
   let closingAttached = !DEFER_CLOSING || !closingSrc || !!closingVideo.getAttribute('src');
+  // Attached but held: the autoplay attribute would start it with the
+  // source, so that is switched off first and playback is owned by
+  // syncClosingPlayback below (preload="auto" still decodes the first
+  // frame, which is all the wave needs to be able to sample it).
+  let closingHeld = true;
   function attachClosing(): void {
     if (closingAttached) return;
     closingAttached = true;
+    closingVideo!.autoplay = false;
     closingVideo!.src = closingSrc;
-    if (!REDUCE) void closingVideo!.play().catch(() => { /* autoplay attribute retries when allowed */ });
+    syncClosingPlayback();
   }
   function maybeAttachClosing(): void {
     if (closingAttached) return;
     const act = getAct();
     if (act && window.scrollY >= act.top + CLOSING_LOAD_AT * act.height) attachClosing();
   }
+  function syncClosingPlayback(): void {
+    if (REDUCE || !closingAttached) return;
+    const act = getAct();
+    if (!act) return;
+    const y = window.scrollY;
+    const play = y >= act.top + (closingHeld ? CLOSING_PLAY_AT : CLOSING_HOLD_BELOW) * act.height;
+    if (play === !closingHeld) return;
+    closingHeld = !play;
+    if (play) void closingVideo!.play().catch(() => { /* autoplay policy: the reveal copes with a still loop */ });
+    else closingVideo!.pause();
+  }
   if (!closingAttached) {
     if (mainVideo.readyState >= 1) attachClosing();
     else mainVideo.addEventListener('loadedmetadata', attachClosing, { once: true });
     window.addEventListener('scroll', maybeAttachClosing, { passive: true });
     maybeAttachClosing();
+  } else if (!REDUCE) {
+    // Desktop: attached at parse time and already autoplaying; hold it the
+    // same way until the reader is near the end.
+    closingVideo.autoplay = false;
+    closingVideo.pause();
   }
+  window.addEventListener('scroll', syncClosingPlayback, { passive: true });
+  syncClosingPlayback();
 
   // The viewport height the act was laid out for (act.height / span, the
   // engine's own 100vh at layout) rather than the live innerHeight, so the

@@ -4,6 +4,7 @@ import { initClosingWave } from './closing-wave';
 import { initPaintForm } from './paint-form';
 import { initMainFraming } from './framing';
 import { initScrollCue } from './scroll-cue';
+import { initScrubSeek } from './scrub-seek';
 
 /*
   Pass 2 scope: the Opening Loop -> Main Video handoff and scroll scrubbing.
@@ -89,6 +90,9 @@ reducedMotion.addEventListener('change', (event) => {
   applyMotionPreference(event.matches);
 });
 
+// Installed on the Main Video before the engine takes it: the engine's
+// currentTime writes go through the frame-aware setter from the first seek.
+initScrubSeek();
 window.ScrollCraft?.mount();
 // Before the effect modules: they read the video's object-position on each
 // draw, and this is what sets it on phones.
