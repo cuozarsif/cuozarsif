@@ -1,7 +1,9 @@
 /*
   Contact endpoint: POST /api/contact -> one email through Resend.
 
-  A Vercel Node.js function using the Web Request/Response signature. The
+  A Vercel Node.js function using the Web Request/Response signature (a
+  named POST export: a default export is invoked with the legacy req/res
+  pair on Vercel and a returned Response is silently ignored). The
   Resend key is read here, server-side, from RESEND_API_KEY and is never
   logged or echoed. Configuration comes from the environment only:
 
@@ -64,7 +66,7 @@ function rateLimited(key: string): boolean {
   return recent.length > RATE_MAX;
 }
 
-export default async function handler(request: Request): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   if (request.method !== 'POST') {
     return new Response(null, { status: 405, headers: { allow: 'POST' } });
   }
