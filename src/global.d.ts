@@ -1,5 +1,5 @@
 /*
-  Ambient type for the vendored scroll-craft engine (src/engine/scrollcraft.js),
+  Ambient type for the vendored scroll-craft engine (public/engine/scrollcraft.js),
   loaded as a classic script and attached to `window.ScrollCraft`. The engine
   itself is plain JS and is never edited per-project, so its shape is declared
   here rather than adding types inside the vendored file.

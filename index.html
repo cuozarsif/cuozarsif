@@ -214,9 +214,11 @@
          canvas so the approved Ibex Resonance program is untouched; the two
          never draw at the same scroll position. -->
     <canvas id="closing-wave" aria-hidden="true"></canvas>
-    <!-- Vendor, unedited (see src/engine/). Classic script so it runs before
+    <!-- Vendor, unedited, served verbatim from public/engine/ (a classic
+         script under src/ is not bundled by Vite and would 404 in the
+         production build). Classic so it runs before
          the deferred module below and window.ScrollCraft exists in time. -->
-    <script src="/src/engine/scrollcraft.js"></script>
+    <script src="/engine/scrollcraft.js"></script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
