@@ -684,3 +684,35 @@ body {
      and the metadata move in and the name yields to the image. */
   .closing-editorial { --rule-x: 62%; --rule-y: 56%; }
 }
+
+/* Narrow portrait screens. The name (~256px at its 2rem floor) spans most
+   of a phone's width, so the vertical rule moves out past it and, below
+   ~376px, the name yields a little (8.5vw) so the rule never cuts it.
+   Everything keeps its place on the rule: name above at the gutter, the
+   mark at the crossing, disciplines below. */
+@media (orientation: portrait) and (max-width: 860px) {
+  .closing-editorial { --rule-x: 82%; }
+  .closing-editorial__name { font-size: min(clamp(2rem, 4.4vw, 4.6rem), 8.5vw); }
+}
+
+/* Phones: there is no room for the location block beside the name above
+   the rule, so it joins the disciplines below it, left-aligned at the same
+   gutter. Same stagger (--k-line), same type. */
+@media (orientation: portrait) and (max-width: 600px) {
+  .closing-editorial__place {
+    right: auto;
+    bottom: auto;
+    left: var(--gutter);
+    top: calc(var(--rule-y) + 3rem);
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+/* The narrowest phones: the disciplines row (three words, dividers,
+   0.32em tracking) is exactly the width of a 320px screen, so its
+   separators tighten a little there. */
+@media (orientation: portrait) and (max-width: 360px) {
+  .closing-editorial__disciplines { gap: 1rem; }
+  .closing-editorial__disciplines span + span::before { margin-right: 1rem; }
+}
