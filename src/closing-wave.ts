@@ -24,7 +24,7 @@
   move unless the scroll does.
 */
 
-import { CENTER, readFocus, type Focus } from './cover';
+import { readFocus, type Focus } from './cover';
 
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Touch devices render the wave at no more than 1.5x (its displacement is
@@ -317,12 +317,14 @@ export function initClosingWave(): void {
   const uBReady = gl.getUniformLocation(program, 'uBReady');
   const uFocusA = gl.getUniformLocation(program, 'uFocusA');
   const uFocusB = gl.getUniformLocation(program, 'uFocusB');
-  // Each layer's object-position from its computed style; re-read on resize.
-  let focusA: Focus = CENTER;
-  let focusB: Focus = CENTER;
-  function readFocusPoints(): void {
-    focusA = readFocus(mainVideo);
-    focusB = readFocus(closingVideo);
+  // The stage box. Desktop keeps the viewport numbers it was approved
+  // with; on touch devices the stage layers are sized to the large
+  // viewport (style.css), so the closing layer's real rectangle is
+  // measured instead.
+  function stageBox(): { w: number; h: number } {
+    if (!COARSE) return { w: window.innerWidth, h: window.innerHeight };
+    const r = closing!.getBoundingClientRect();
+    return { w: r.width || window.innerWidth, h: r.height || window.innerHeight };
   }
 
   gl.enable(gl.BLEND);
@@ -348,8 +350,12 @@ export function initClosingWave(): void {
   }
 
   function renderFrame(C: number): void {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const box = stageBox();
+    const w = box.w;
+    const h = box.h;
+    // Each layer's object-position from its computed style, read per frame.
+    const focusA: Focus = readFocus(mainVideo);
+    const focusB: Focus = readFocus(closingVideo);
     uploadVideoFrame(texA, mainVideo!);
     if (uploadVideoFrame(texB, closingVideo!)) texBHasFrame = true;
     clear();
@@ -483,12 +489,12 @@ export function initClosingWave(): void {
   }
 
   function resize(): void {
-    readFocusPoints();
     dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-    canvas!.width = Math.round(window.innerWidth * dpr);
-    canvas!.height = Math.round(window.innerHeight * dpr);
-    canvas!.style.width = window.innerWidth + 'px';
-    canvas!.style.height = window.innerHeight + 'px';
+    const box = stageBox();
+    canvas!.width = Math.round(box.w * dpr);
+    canvas!.height = Math.round(box.h * dpr);
+    canvas!.style.width = box.w + 'px';
+    canvas!.style.height = box.h + 'px';
     draw(currentC());
     ensureLive();
   }

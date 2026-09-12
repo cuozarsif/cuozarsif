@@ -478,6 +478,32 @@ body {
 }
 
 /* ---------------------------------------------------------------------- */
+/* Touch devices: the stage box                                           */
+/* ---------------------------------------------------------------------- */
+
+/* On a phone the browser's URL bar collapses during the first downward
+   swipe. Chrome sizes position:fixed; inset:0 layers to the layout
+   viewport and only enlarges them once the gesture ends, so for the
+   length of that swipe the newly exposed strip at the bottom shows the
+   document behind the stages - the black body - before the layers snap
+   to the new height. Sizing every stage layer to the large viewport
+   (100lvh, anchored to the top) makes them already tall enough: the bar
+   simply covers their bottom edge, the picture never moves or re-crops,
+   and nothing behind them can show. The effect modules and the paint
+   form measure these layers' real boxes rather than window.innerHeight,
+   so their geometry follows. Desktop has no dynamic bar: lvh equals the
+   viewport and nothing changes. */
+@media (hover: none) and (pointer: coarse) {
+  .opening-loop,
+  .main-video [data-sc-stage],
+  .paint-form,
+  .closing-loop {
+    bottom: auto;
+    height: 100lvh;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
 /* Portrait focus point                                                   */
 /* ---------------------------------------------------------------------- */
 
@@ -707,6 +733,16 @@ body {
     align-items: flex-start;
     text-align: left;
   }
+}
+
+/* Phones: with the vertical rule at 82% the final O of TATTOO sat on the
+   hairline. Only that character moves (index.html wraps it): a transform,
+   so the word, its start, its tracking, the dividers and the other labels
+   are laid out exactly as before. 0.3em is the whole of the letter gap
+   before it - the most the O can travel without riding onto the O before
+   it - and on a 390px screen that is exactly what clears the rule. */
+@media (orientation: portrait) and (max-width: 600px) {
+  .tattoo-final-o { display: inline-block; transform: translateX(-0.3em); }
 }
 
 /* The narrowest phones: the disciplines row (three words, dividers,

@@ -23,9 +23,12 @@
   is never touched.
 */
 
-import { CENTER, coverRect, readFocus, type Focus } from './cover';
+import { coverRect, readFocus, type Focus } from './cover';
 
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Touch devices: the stage layers are sized to the large viewport
+// (style.css), so the frame is measured from the stage itself there.
+const COARSE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 // Video seconds. The form's region of the band is fully painted by ~15.0s
 // (measured per column from the footage: the right half from ~13.0s, the
@@ -108,18 +111,23 @@ export function initPaintForm(): void {
     return p * (mainVideo!.duration || 32.633);
   }
 
-  // The video's object-position (CSS sets a focus point on narrow portrait
-  // screens; the default is the centre), re-read on resize so the frame
-  // follows whatever the DOM video shows.
-  let focus: Focus = CENTER;
-  function onResize(): void {
-    focus = readFocus(mainVideo);
-    apply();
+  // The stage box the video is cover-fitted into - the viewport numbers
+  // desktop was approved with, or on touch devices the stage's real
+  // rectangle (the large viewport, see style.css) - and the video's
+  // object-position from its computed style, both read on every apply so
+  // the frame always follows whatever the DOM video shows.
+  const mainStage = mainVideo.closest<HTMLElement>('[data-sc-stage]');
+  function stageBox(): { w: number; h: number } {
+    if (!COARSE) return { w: window.innerWidth, h: window.innerHeight };
+    const r = mainStage?.getBoundingClientRect();
+    return { w: r?.width || window.innerWidth, h: r?.height || window.innerHeight };
   }
 
   function apply(): void {
     const t = videoTime();
-    const c = cover(window.innerWidth, window.innerHeight, focus);
+    const box = stageBox();
+    const focus: Focus = readFocus(mainVideo);
+    const c = cover(box.w, box.h, focus);
 
     let f = clamp01((t - REVEAL_FROM) / (REVEAL_TO - REVEAL_FROM));
     let release = smooth((t - RELEASE_FROM) / (RELEASE_TO - RELEASE_FROM));
@@ -286,6 +294,6 @@ export function initPaintForm(): void {
   }
 
   window.addEventListener('scroll', onScroll, { passive: true });
-  window.addEventListener('resize', onResize, { passive: true });
-  onResize();
+  window.addEventListener('resize', apply, { passive: true });
+  apply();
 }

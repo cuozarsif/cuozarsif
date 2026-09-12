@@ -2,6 +2,7 @@ import { inject as injectAnalytics } from '@vercel/analytics';
 import { initIbexResonance } from './ibex-resonance';
 import { initClosingWave } from './closing-wave';
 import { initPaintForm } from './paint-form';
+import { initMainFraming } from './framing';
 
 /*
   Pass 2 scope: the Opening Loop -> Main Video handoff and scroll scrubbing.
@@ -88,6 +89,9 @@ reducedMotion.addEventListener('change', (event) => {
 });
 
 window.ScrollCraft?.mount();
+// Before the effect modules: they read the video's object-position on each
+// draw, and this is what sets it on phones.
+initMainFraming();
 initIbexResonance();
 initClosingWave();
 initPaintForm();

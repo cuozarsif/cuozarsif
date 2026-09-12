@@ -34,7 +34,7 @@
   the framing changes underneath it.
 */
 
-import { CENTER, coverRect, readFocus, type Focus } from './cover';
+import { coverRect, readFocus, type Focus } from './cover';
 
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Phones and tablets: a touch device renders the pass at no more than 1.5x
@@ -522,14 +522,15 @@ export function initIbexResonance(): void {
   const uShiftB = gl.getUniformLocation(program, 'uShiftB');
   const uFocusA = gl.getUniformLocation(program, 'uFocusA');
   const uFocusB = gl.getUniformLocation(program, 'uFocusB');
-  // Each layer's object-position, read from its computed style (CSS decides;
-  // the default stays the centre). Re-read on resize, which is also where an
-  // orientation change lands.
-  let focusA: Focus = CENTER;
-  let focusB: Focus = CENTER;
-  function readFocusPoints(): void {
-    focusA = readFocus(openingVideo);
-    focusB = readFocus(mainVideo);
+  // The stage box. Desktop keeps the viewport numbers it was approved
+  // with. On touch devices the stage layers are sized to the large
+  // viewport (style.css) rather than the layout viewport, so the opening
+  // layer's real rectangle (every stage layer shares it) is what the
+  // videos are cover-fitted into, and it is measured instead.
+  function stageBox(): { w: number; h: number } {
+    if (!COARSE) return { w: window.innerWidth, h: window.innerHeight };
+    const r = openingLoop!.getBoundingClientRect();
+    return { w: r.width || window.innerWidth, h: r.height || window.innerHeight };
   }
   const uSeed = gl.getUniformLocation(program, 'uSeed');
   const uFil = gl.getUniformLocation(program, 'uFil');
@@ -562,8 +563,14 @@ export function initIbexResonance(): void {
   }
 
   function draw(R: number): void {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const box = stageBox();
+    const w = box.w;
+    const h = box.h;
+    // Each layer's object-position from its computed style, read per draw
+    // (CSS decides; on phones the Main video's framing also moves with the
+    // footage, see src/framing.ts).
+    const focusA: Focus = readFocus(openingVideo);
+    const focusB: Focus = readFocus(mainVideo);
 
     applyReveal(R);
 
@@ -670,12 +677,12 @@ export function initIbexResonance(): void {
   }
 
   function resize(): void {
-    readFocusPoints();
     dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-    canvas!.width = Math.round(window.innerWidth * dpr);
-    canvas!.height = Math.round(window.innerHeight * dpr);
-    canvas!.style.width = window.innerWidth + 'px';
-    canvas!.style.height = window.innerHeight + 'px';
+    const box = stageBox();
+    canvas!.width = Math.round(box.w * dpr);
+    canvas!.height = Math.round(box.h * dpr);
+    canvas!.style.width = box.w + 'px';
+    canvas!.style.height = box.h + 'px';
     draw(currentR());
   }
 
