@@ -37,6 +37,15 @@
 import { CENTER, coverRect, readFocus, type Focus } from './cover';
 
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Phones and tablets: a touch device renders the pass at no more than 1.5x
+// and samples the spectrum with six taps instead of ten. On a phone the
+// dispersion spans only ~25 device px, so six taps still read as a
+// continuous rainbow, and the footage itself carries no more than ~1.3
+// source px per CSS px in the portrait crop, so 1.5x resolves all of it.
+// Desktop keeps 2x and ten taps: its shader text is byte-identical.
+const COARSE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+const MAX_DPR = COARSE ? 1.5 : 2;
+const SPECTRAL_TAPS = COARSE ? 6 : 10;
 
 // Measured by eye against captured frames: both fractions target the ibex's
 // chest/shoulder, where the wiping woman's hand meets the bronze.
@@ -112,7 +121,10 @@ void main() {
 // sideways slide in torn horizontal bands, and a six-tap spectral spread
 // whose weights sum to white. Nothing is a painted tint; where no
 // displacement occurs the taps coincide and the image is untouched.
-const FRAG_SRC = `
+// The fragment shader, with the spectral tap count as the only build-time
+// parameter (10 on desktop, 6 on coarse pointers).
+function fragSource(taps: number): string {
+  return `
 precision highp float;
 uniform sampler2D uTexA;
 uniform sampler2D uTexB;
@@ -315,12 +327,13 @@ void main() {
   vec2 shA = uShiftB * (k * 0.5);
   vec2 shB = uShiftB * (1.0 - (1.0 - k) * 0.5);
 
-  /* Ten spectral taps along the dispersion axis, weights normalised to
-     white: no spread = the exact image, spread = the image as a continuous
-     rainbow rather than a handful of coloured copies. */
+  /* Spectral taps along the dispersion axis (ten on desktop, six on a
+     coarse pointer), weights normalised to white: no spread = the exact
+     image, spread = the image as a continuous rainbow rather than a handful
+     of coloured copies. */
   vec3 accA = vec3(0.0), accB = vec3(0.0), wsum = vec3(0.0);
-  for (int i = 0; i < 10; i++) {
-    float t = (float(i) + 0.5) / 10.0;
+  for (int i = 0; i < ${taps}; i++) {
+    float t = (float(i) + 0.5) / ${taps}.0;
     vec3 wgt = spectral(t);
     vec2 tap = base + dirD * ((t - 0.5) * 2.0 * chroma);
     accA += wgt * texture2D(uTexA, coverUV(tap + shA, uIntrinsicA, uFocusA)).rgb;
@@ -350,6 +363,8 @@ void main() {
   gl_FragColor = vec4(col, alpha);
 }
 `;
+}
+const FRAG_SRC = fragSource(SPECTRAL_TAPS);
 
 function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLShader | null {
   const sh = gl.createShader(type);
@@ -435,7 +450,9 @@ export function initIbexResonance(): void {
 
   const openingVideo = document.querySelector<HTMLVideoElement>('.opening-loop__video');
   const mainVideo = document.querySelector<HTMLVideoElement>('.main-video video[data-sc-scrub]');
-  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
+  // A single fullscreen triangle has no edge to antialias: MSAA would only
+  // cost a resolve per frame, so it is off.
+  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: false });
 
   if (!gl || !openingVideo || !mainVideo) {
     // No WebGL support, or the videos aren't there: still crossfade the two
@@ -523,7 +540,7 @@ export function initIbexResonance(): void {
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
 
   function uploadVideoFrame(tex: WebGLTexture, video: HTMLVideoElement): boolean {
     if (video.readyState < 2) return false; // no decoded frame yet; keep the last upload
@@ -654,7 +671,7 @@ export function initIbexResonance(): void {
 
   function resize(): void {
     readFocusPoints();
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
     canvas!.width = Math.round(window.innerWidth * dpr);
     canvas!.height = Math.round(window.innerHeight * dpr);
     canvas!.style.width = window.innerWidth + 'px';

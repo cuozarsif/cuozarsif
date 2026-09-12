@@ -27,6 +27,11 @@
 import { CENTER, readFocus, type Focus } from './cover';
 
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Touch devices render the wave at no more than 1.5x (its displacement is
+// a few px and the handoff is overlapped, so nothing is lost); desktop
+// keeps 2x.
+const COARSE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+const MAX_DPR = COARSE ? 1.5 : 2;
 // Same split as index.html's inline script: on these devices the Closing
 // Loop is not attached at parse time and is loaded from here instead.
 const DEFER_CLOSING = window.matchMedia('(hover: none) and (pointer: coarse), (max-width: 860px)').matches;
@@ -259,7 +264,8 @@ export function initClosingWave(): void {
     return;
   }
 
-  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false });
+  // A single fullscreen triangle has no edge to antialias: MSAA is off.
+  const gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: false });
   if (!gl) {
     // No WebGL: a plain, still scroll-driven crossfade rather than a stuck page.
     const fade = () => { closing!.style.opacity = String(currentC()); applyEditorial(false); };
@@ -322,7 +328,7 @@ export function initClosingWave(): void {
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
 
   function uploadVideoFrame(tex: WebGLTexture, video: HTMLVideoElement): boolean {
     if (video.readyState < 2) return false;
@@ -478,7 +484,7 @@ export function initClosingWave(): void {
 
   function resize(): void {
     readFocusPoints();
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
     canvas!.width = Math.round(window.innerWidth * dpr);
     canvas!.height = Math.round(window.innerHeight * dpr);
     canvas!.style.width = window.innerWidth + 'px';
