@@ -27,6 +27,13 @@
 import { CENTER, readFocus, type Focus } from './cover';
 
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Same split as index.html's inline script: on these devices the Closing
+// Loop is not attached at parse time and is loaded from here instead.
+const DEFER_CLOSING = window.matchMedia('(hover: none) and (pointer: coarse), (max-width: 860px)').matches;
+// Scroll trigger for that load, as a fraction of the Main Video act: halfway
+// through, i.e. ~6.65 viewport-heights (about 16.7s of footage) before the
+// wave begins - several times what the loop needs on a typical mobile link.
+const CLOSING_LOAD_AT = 0.5;
 
 const MAIN_INTRINSIC = { w: 1920, h: 1080 };
 const CLOSING_INTRINSIC = { w: 1280, h: 720 };
@@ -175,6 +182,32 @@ export function initClosingWave(): void {
   function getAct() {
     const inst = window.ScrollCraft?.instances?.[0];
     return inst?.acts?.[0] ?? null;
+  }
+
+  // ---- deferred Closing Loop (phones) ---------------------------------
+  // index.html attaches the loop's source at parse time on desktop and
+  // leaves it to us on phones. It is attached once the Main Video's blob
+  // has landed (the bandwidth is free again) or once the reader is halfway
+  // through the act, whichever comes first. Everything downstream already
+  // copes with a loop that is not decoded yet (uBReady, readyState checks).
+  const closingSrc = closingVideo.dataset.src ?? '';
+  let closingAttached = !DEFER_CLOSING || !closingSrc || !!closingVideo.getAttribute('src');
+  function attachClosing(): void {
+    if (closingAttached) return;
+    closingAttached = true;
+    closingVideo!.src = closingSrc;
+    if (!REDUCE) void closingVideo!.play().catch(() => { /* autoplay attribute retries when allowed */ });
+  }
+  function maybeAttachClosing(): void {
+    if (closingAttached) return;
+    const act = getAct();
+    if (act && window.scrollY >= act.top + CLOSING_LOAD_AT * act.height) attachClosing();
+  }
+  if (!closingAttached) {
+    if (mainVideo.readyState >= 1) attachClosing();
+    else mainVideo.addEventListener('loadedmetadata', attachClosing, { once: true });
+    window.addEventListener('scroll', maybeAttachClosing, { passive: true });
+    maybeAttachClosing();
   }
 
   // The viewport height the act was laid out for (act.height / span, the

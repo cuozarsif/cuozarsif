@@ -174,9 +174,24 @@
           loop
           playsinline
           preload="auto"
-        >
-          <source src="/media/closing-loop.mp4" type="video/mp4" />
-        </video>
+          data-src="/media/closing-loop.mp4"
+        ></video>
+        <!--
+          The loop is 17 MB and is not needed until the very end. On a
+          desktop it is attached here, synchronously at parse time, exactly
+          as the <source> it replaces was, so nothing about desktop loading
+          changes. On a phone (coarse pointer, or a narrow screen) it is
+          left unattached and src/closing-wave.ts attaches it once the Main
+          Video has arrived or the reader is halfway through the act -
+          whichever comes first - so the initial page load never spends
+          the reader's data on it.
+        -->
+        <script>
+          (function () {
+            var v = document.currentScript.previousElementSibling;
+            if (!matchMedia('(hover: none) and (pointer: coarse), (max-width: 860px)').matches) v.src = v.dataset.src;
+          })();
+        </script>
         <!--
           Editorial layer over the settled Closing Loop. Real text, not
           baked into the video (the loop is clean). It emerges only after
