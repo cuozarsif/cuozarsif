@@ -112,8 +112,8 @@
         (--f reveal; --ty/--o/--blur/--sc the ride and the dissolve; --mx1..3
         each groove's own barely-there nudge). The video is untouched.
 
-        No delivery endpoint exists in the project yet: submit validates,
-        shows a sent state, and nothing leaves the page (see src/paint-form.ts).
+        Submit validates, then posts the message as JSON to /api/contact
+        (api/contact.ts, relayed through Resend); the page never reloads.
       -->
       <section class="paint-form" aria-label="Contact" style="--f: 0; --ty: 0px; --o: 1; --blur: 0px; --sc: 1; --mx1: 0; --mx2: 0; --mx3: 0">
         <!--
@@ -139,6 +139,8 @@
                 <span class="sr-only">Your message</span>
                 <textarea name="message" placeholder="Your message..." rows="2" required></textarea>
               </label>
+              <!-- Honeypot: never shown, never focusable; a bot that fills every field trips it (see api/contact.ts). -->
+              <input type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" hidden />
               <button type="submit" class="paint-form__field paint-form__send">Send message <span aria-hidden="true">&rarr;</span></button>
             </div>
             <p class="paint-form__status sr-only" aria-live="polite"></p>

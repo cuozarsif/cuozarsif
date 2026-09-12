@@ -145,12 +145,17 @@ export function initPaintForm(): void {
   // ---- submit ----------------------------------------------------------
   // Validation is ours, not the browser's bubble (novalidate on the form):
   // a field that fails is pressed deeper into the paint and takes focus;
-  // it releases as soon as the visitor types. On success the fields settle
-  // to read-only and the button reads "Message sent". No delivery endpoint
-  // exists in the project yet, so nothing leaves the page: wire a real
-  // endpoint here before this goes public, or the success state is a lie.
-  const fields = Array.from(form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'));
+  // it releases as soon as the visitor types. A valid form is posted as
+  // JSON to /api/contact (a Vercel function that relays it through Resend,
+  // see api/contact.ts); the page never reloads. While it is in flight the
+  // button reads "Sending"; on success the fields settle to read-only and
+  // it reads "Message sent"; on failure it says so and everything stays
+  // editable so the visitor can simply try again.
+  const fields = Array.from(form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input[required], textarea[required]'));
+  const honeypot = form.querySelector<HTMLInputElement>('input[name="company"]');
   const send = form.querySelector<HTMLButtonElement>('.paint-form__send');
+  const sendLabel = send ? send.innerHTML : '';
+  let failed = false;
   const status = form.querySelector<HTMLElement>('.paint-form__status');
   const groove = (el: Element): HTMLElement | null => el.closest('.paint-form__field');
 
@@ -164,9 +169,15 @@ export function initPaintForm(): void {
     el.addEventListener('input', () => { if (el.validity.valid) setInvalid(el, false); });
   });
 
+  function setBusy(busy: boolean): void {
+    fields.forEach((el) => { el.readOnly = busy; });
+    if (send) { send.disabled = busy; if (busy) send.textContent = 'Sending'; }
+  }
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (form.dataset.state === 'sent') return;
+    const state = form.dataset.state;
+    if (state === 'sent' || state === 'sending') return;
     let first: HTMLInputElement | HTMLTextAreaElement | null = null;
     fields.forEach((el) => {
       const valid = el.validity.valid && el.value.trim() !== '';
@@ -178,10 +189,41 @@ export function initPaintForm(): void {
       if (status) status.textContent = 'Please complete the highlighted fields.';
       return;
     }
-    form.dataset.state = 'sent';
-    fields.forEach((el) => { el.readOnly = true; });
-    if (send) { send.disabled = true; send.textContent = 'Message sent'; }
-    if (status) status.textContent = 'Your message has been sent.';
+
+    const payload: Record<string, string> = {};
+    fields.forEach((el) => { payload[el.name] = el.value; });
+    if (honeypot) payload.company = honeypot.value;
+
+    form.dataset.state = 'sending';
+    setBusy(true);
+    if (status) status.textContent = 'Sending your message.';
+
+    fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(String(res.status));
+        form.dataset.state = 'sent';
+        if (send) { send.disabled = true; send.textContent = 'Message sent'; }
+        if (status) status.textContent = 'Your message has been sent.';
+      })
+      .catch(() => {
+        delete form.dataset.state;
+        setBusy(false);
+        failed = true;
+        if (send) send.textContent = 'Not sent. Try again';
+        if (status) status.textContent = 'Your message could not be sent. Please try again.';
+      });
+  });
+
+  // The button returns to its own label once the visitor edits after a
+  // failed attempt, so the retry reads as a fresh send.
+  fields.forEach((el) => {
+    el.addEventListener('input', () => {
+      if (failed && send) { failed = false; send.innerHTML = sendLabel; }
+    });
   });
 
   // ---- the surface noticing the viewer --------------------------------
