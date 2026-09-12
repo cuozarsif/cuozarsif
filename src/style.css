@@ -444,10 +444,26 @@ body {
   background: color-mix(in oklab, var(--color-umber) 18%, transparent);
 }
 
-@media (max-width: 860px) {
-  /* Narrow frames crop the band's ends; keep the grooves in the visible middle. */
-  .paint-form__field--name    { left: 47.6%; width: 18.6%; }
-  .paint-form__field--email   { left: 67.4%; width: 18.2%; }
+/* Narrow portrait screens. The Main video is focused at 67% (see the
+   portrait focus point below), so the screen shows the band's middle:
+   frame x ~0.46-0.78 on a 320-wide phone, ~0.50-0.76 on a 390. The
+   silhouette, materials and typography are untouched; only where the
+   grooves sit changes. Horizontal placement is expressed in screen units
+   from the screen's left edge (the frame sits at --vid-x, so
+   -1 * --vid-x is screen x = 0 inside it), which keeps every groove on
+   screen whatever the crop; vertical placement stays in frame fractions,
+   inside the band's clean interior (top ridge <= 32.1%, bottom edge
+   >= 52.2% across the span the grooves use). The same three rows as the
+   desktop - name | email, message, send - simply compressed to the
+   visible width. On a portrait tablet the screen reaches past the
+   stroke's ragged left end (frame x 44.6%), so the left column never
+   starts before 45.5% of the frame. */
+@media (orientation: portrait) and (max-width: 860px) {
+  .paint-form__grooves { --sx0: calc(-1 * var(--vid-x, 0px)); }
+  .paint-form__field--name    { left: max(calc(var(--sx0) + 4vw), 45.5%); right: calc(100% - var(--sx0) - 48vw); width: auto; top: 33.2%; height: 6.4%; }
+  .paint-form__field--email   { left: calc(var(--sx0) + 52vw);            right: calc(100% - var(--sx0) - 96vw); width: auto; top: 33.4%; height: 6.4%; }
+  .paint-form__field--message { left: max(calc(var(--sx0) + 4vw), 45.5%); right: calc(100% - var(--sx0) - 96vw); width: auto; top: 40.6%; height: 6.6%; }
+  .paint-form__send           { left: calc(var(--sx0) + 22vw);            right: calc(100% - var(--sx0) - 68vw); width: auto; top: 47.6%; height: 4.4%; padding: 0 0.6em; white-space: nowrap; }
 }
 
 /* ---------------------------------------------------------------------- */
