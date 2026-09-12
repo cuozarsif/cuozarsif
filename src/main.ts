@@ -25,6 +25,23 @@ import { initPaintForm } from './paint-form';
   behavior rather than a bespoke transition.
 */
 
+/*
+  A refresh restarts the experience. Browsers restore the previous scroll
+  position on reload, which would drop the reader into the middle of the
+  scrubbed sequence with the Opening Loop already gone. For a reload only
+  (back/forward keeps the browser's normal restoration), scroll restoration
+  is switched to manual and the page is put back at 0 before scroll-craft
+  mounts, so every scroll-driven system reads its initial state. 'instant'
+  because scrollcraft.css sets scroll-behavior:smooth.
+*/
+const navigation = performance.getEntriesByType('navigation')[0] as
+  | PerformanceNavigationTiming
+  | undefined;
+if (navigation?.type === 'reload' && 'scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+}
+
 const openingVideo = document.querySelector<HTMLVideoElement>(
   '.opening-loop__video',
 );
