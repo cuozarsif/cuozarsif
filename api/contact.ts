@@ -146,9 +146,16 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (!upstream.ok) {
-    // Status only. The upstream body may describe our own configuration.
-    console.error('[contact] resend responded', upstream.status);
-    return json(502, { error: 'delivery_failed' });
+    // Resend's error body names the reason (unverified domain, bad key,
+    // invalid field) and never contains the key; it goes to the server log
+    // only. The visitor sees the status code, nothing else.
+    let reason = '';
+    try {
+      const err = (await upstream.json()) as { name?: unknown; message?: unknown };
+      reason = [err.name, err.message].filter((v) => typeof v === 'string').join(': ');
+    } catch { /* non-JSON body: status alone */ }
+    console.error('[contact] resend responded', upstream.status, reason);
+    return json(502, { error: 'delivery_failed', upstream: upstream.status });
   }
 
   return json(200, { ok: true });
