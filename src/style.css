@@ -501,6 +501,15 @@ body {
     bottom: auto;
     height: 100lvh;
   }
+  /* The wordmark sits at the stage's bottom edge, which on this taller
+     stage is behind the URL bar until the first swipe hides it. Measure
+     its gutter from the small viewport's bottom instead (the stage is
+     100lvh tall, so the extra lvh - svh is added), so it is on screen from
+     the first frame and stays put when the bar goes. Same gutter, same
+     type; on a phone with no bar in play the two values coincide. */
+  .wordmark {
+    bottom: calc(100lvh - 100svh + clamp(1.25rem, 4vw, 3rem));
+  }
 }
 
 /* ---------------------------------------------------------------------- */
@@ -740,9 +749,18 @@ body {
    so the word, its start, its tracking, the dividers and the other labels
    are laid out exactly as before. 0.3em is the whole of the letter gap
    before it - the most the O can travel without riding onto the O before
-   it - and on a 390px screen that is exactly what clears the rule. */
+   it. The rule itself (with the mark at its crossing) then steps a little
+   further right on phones, the least that leaves a clean gap after that
+   O on each width: 84% (390px+), 87% (up to 380px), 93% (up to 360px). */
 @media (orientation: portrait) and (max-width: 600px) {
   .tattoo-final-o { display: inline-block; transform: translateX(-0.3em); }
+  .closing-editorial { --rule-x: 84%; }
+}
+@media (orientation: portrait) and (max-width: 380px) {
+  .closing-editorial { --rule-x: 87%; }
+}
+@media (orientation: portrait) and (max-width: 360px) {
+  .closing-editorial { --rule-x: 93%; }
 }
 
 /* The narrowest phones: the disciplines row (three words, dividers,
