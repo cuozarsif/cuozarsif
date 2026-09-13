@@ -35,6 +35,7 @@
 */
 
 import { coverRect, readFocus, type Focus } from './cover';
+import { mainFrameSource, mainFrameReady } from './mobile-scrub';
 
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Phones and tablets: a touch device renders the pass at no more than 1.5x
@@ -561,10 +562,12 @@ export function initIbexResonance(): void {
   let dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
 
   function uploadVideoFrame(tex: WebGLTexture, video: HTMLVideoElement): boolean {
-    if (video.readyState < 2) return false; // no decoded frame yet; keep the last upload
+    // On phones the Main Video's frames live on a canvas (src/mobile-scrub.ts).
+    const source = video === mainVideo ? mainFrameSource(video) : video;
+    if (source === video ? video.readyState < 2 : !mainFrameReady()) return false; // no decoded frame yet; keep the last upload
     gl!.bindTexture(gl!.TEXTURE_2D, tex);
     try {
-      gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, video);
+      gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, source);
       return true;
     } catch {
       // A frame mid-seek can throw on upload; skip it, the next scroll frame

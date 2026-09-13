@@ -5,6 +5,7 @@ import { initPaintForm } from './paint-form';
 import { initMainFraming } from './framing';
 import { initScrollCue } from './scroll-cue';
 import { initScrubSeek } from './scrub-seek';
+import { initMobileScrub } from './mobile-scrub';
 
 /*
   Pass 2 scope: the Opening Loop -> Main Video handoff and scroll scrubbing.
@@ -94,6 +95,9 @@ reducedMotion.addEventListener('change', (event) => {
 // currentTime writes go through the frame-aware setter from the first seek.
 initScrubSeek();
 window.ScrollCraft?.mount();
+// Phones with WebCodecs: the Main Video is decoded sequentially onto a canvas
+// once the engine's blob has landed; everywhere else this returns at once.
+initMobileScrub();
 // Before the effect modules: they read the video's object-position on each
 // draw, and this is what sets it on phones.
 initMainFraming();

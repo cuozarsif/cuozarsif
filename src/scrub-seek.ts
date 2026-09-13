@@ -23,6 +23,29 @@
 // main-video-g8.mp4: 30fps, constant frame rate.
 const MAIN_FPS = 30;
 
+/*
+  A sink takes the engine's writes instead of the element (src/mobile-scrub.ts
+  hands them to the WebCodecs frame engine). While a sink is set the getter
+  reports the sink's own playhead so ScrollCraft's deadband keeps meaning
+  "the target left the frame on screen". Once the element has been unloaded
+  (its bytes captured, its decoder released) ScrollCraft's targets arrive
+  normalised 0..1 (duration is NaN, it multiplies by 1) and the getter must
+  never fall inside the deadband, or the engine would stop writing: it
+  returns -1, which no target can be within 20ms of.
+*/
+export interface ScrubSink {
+  setTarget(seconds: number): void;
+  shownSeconds(): number;
+  durationSeconds: number;
+}
+let sink: ScrubSink | null = null;
+let unloaded = false;
+
+export function setScrubSink(next: ScrubSink | null, elementUnloaded = false): void {
+  sink = next;
+  unloaded = !!next && elementUnloaded;
+}
+
 export function initScrubSeek(): void {
   const video = document.querySelector<HTMLVideoElement>('.main-video video[data-sc-scrub]');
   if (!video) return;
@@ -40,9 +63,17 @@ export function initScrubSeek(): void {
     configurable: true,
     enumerable: true,
     get(): number {
+      if (sink) return unloaded ? -1 : sink.shownSeconds();
       return nativeGet.call(video) as number;
     },
     set(t: number): void {
+      if (sink) {
+        if (!(t >= 0)) return;
+        const duration = video.duration;
+        const seconds = Number.isFinite(duration) && duration > 0 ? t : t * sink.durationSeconds;
+        sink.setTarget(seconds);
+        return;
+      }
       // The only write the engine makes while a seek is in flight is its
       // stuck-seek nudge (currentTime + 0.001 after 700ms). It must reach
       // the element as-is or a stalled decoder would never be re-kicked.

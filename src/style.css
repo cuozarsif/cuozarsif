@@ -251,6 +251,18 @@ body {
   will-change: opacity;
 }
 
+/* On phones with WebCodecs the Main Video is drawn by src/mobile-scrub.ts
+   onto this canvas instead of the <video>: same box, same cover fit, same
+   focus point (below), same inline object-position mirrored from the video.
+   It exists only while that path is active. */
+.main-video [data-sc-stage] canvas.main-video__frames {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* ---------------------------------------------------------------------- */
 /* Ibex Resonance (Opening -> Main Video transition overlay)              */
 /* ---------------------------------------------------------------------- */
@@ -578,7 +590,8 @@ body {
    50% 50% and is untouched. */
 @media (orientation: portrait) and (max-width: 860px) {
   .opening-loop__video { object-position: 70% 50%; }
-  .main-video video[data-sc-scrub] { object-position: 67% 50%; }
+  .main-video video[data-sc-scrub],
+  .main-video canvas.main-video__frames { object-position: 67% 50%; }
 }
 
 /* ---------------------------------------------------------------------- */

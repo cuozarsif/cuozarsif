@@ -25,6 +25,7 @@
 */
 
 import { readFocus, type Focus } from './cover';
+import { mainFrameSource, mainFrameReady } from './mobile-scrub';
 
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Touch devices render the wave at no more than 1.5x (its displacement is
@@ -367,10 +368,12 @@ export function initClosingWave(): void {
   let dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
 
   function uploadVideoFrame(tex: WebGLTexture, video: HTMLVideoElement): boolean {
-    if (video.readyState < 2) return false;
+    // On phones the Main Video's frames live on a canvas (src/mobile-scrub.ts).
+    const source = video === mainVideo ? mainFrameSource(video) : video;
+    if (source === video ? video.readyState < 2 : !mainFrameReady()) return false;
     gl!.bindTexture(gl!.TEXTURE_2D, tex);
     try {
-      gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, video);
+      gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, source);
       return true;
     } catch {
       return false;
