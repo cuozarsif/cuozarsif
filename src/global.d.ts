@@ -16,8 +16,18 @@ interface ScrollCraftAct {
   span: number;
 }
 
+// A scrub clip's playhead: `target` is the scroll position mapped into the
+// clip (0..1), written on every scroll read; `cur` is the smoothed value the
+// engine walks toward it.
+interface ScrollCraftClip {
+  target: number;
+  cur: number;
+  lerp: number;
+}
+
 interface ScrollCraftInstance {
   acts: ScrollCraftAct[];
+  clips: ScrollCraftClip[];
 }
 
 declare global {

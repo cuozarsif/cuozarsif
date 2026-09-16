@@ -737,6 +737,10 @@ body {
   opacity: var(--k-disc);
   transform: translateY(calc((1 - var(--k-disc)) * 8px));
 }
+/* The two O's of TATTOO: round against round reads tighter than the flat
+   tracking between the other letters, so the final O (index.html wraps it)
+   carries a little extra space before it. Only that one gap changes. */
+.tattoo-final-o { display: inline-block; margin-left: 0.08em; }
 .closing-editorial__disciplines span + span::before {
   content: "";
   display: inline-block;
@@ -816,9 +820,12 @@ body {
    before it - the most the O can travel without riding onto the O before
    it. The rule itself (with the mark at its crossing) then steps a little
    further right on phones, the least that leaves a clean gap after that
-   O on each width: 84% (390px+), 87% (up to 380px), 93% (up to 360px). */
+   O on each width: 84% (390px+), 87% (up to 380px), 93% (up to 360px).
+   The pull is 0.18em, not the whole gap: with the extra space above it
+   leaves 0.22em between the two O's - visibly apart, still short of the
+   word's tracking - and the O still clears the hairline on every width. */
 @media (orientation: portrait) and (max-width: 600px) {
-  .tattoo-final-o { display: inline-block; transform: translateX(-0.3em); }
+  .tattoo-final-o { transform: translateX(-0.18em); }
   .closing-editorial { --rule-x: 84%; }
 }
 @media (orientation: portrait) and (max-width: 380px) {

@@ -34,6 +34,105 @@ const EXPECTED = { width: 1920, height: 1080, fps: 30, frames: 979 };
 
 let engine: FrameEngine | null = null;
 
+/*
+  Release easing. ScrollCraft walks its playhead toward the scroll target by
+  a fixed fraction per frame, so when the finger stops the glide that is
+  left covers most of its lag in the first frames and then creeps: the last
+  frame boundary is crossed late and alone, and the stop reads as a tick.
+  This sits between that glide and the engine, only for the moment the
+  input ends: once the page target has held still for STILL_TICKS while the
+  glide is still a frame or more behind it, the remaining distance is eased
+  from where the picture is to the page target with velocity falling
+  smoothly to zero over 80-180ms (longer for a longer remainder, i.e. a
+  faster release), and the picture then holds on the page target while
+  ScrollCraft's own glide catches up underneath. While the finger moves the
+  input passes straight through, and any new movement of the page target
+  (finger, or the browser's own scroll momentum) ends the ease at once: the
+  picture keeps its lead over the glide and gives it back as the input
+  moves, so it never steps against the scroll and never jumps. Touching the
+  screen cancels the ease the same way. At every moment the picture is
+  between the glide and the page position, so the scroll stays the
+  authority and the two agree as soon as the glide arrives.
+*/
+const STILL_TICKS = 2;
+const EASE_MIN_MS = 80;
+const EASE_MAX_MS = 180;
+const EASE_MS_PER_S = 500; // +0.5ms per ms of footage left to cover
+const CATCH_UP = 0.5;      // lead given back per unit of input movement
+
+class ReleaseEase {
+  private lastIn = NaN;
+  private lastPage = NaN;
+  private still = 0;
+  private easing = false;
+  private p0 = 0;
+  private p1 = 0;
+  private t0 = 0;
+  private dur = 0;
+  private holding = false;
+  private lead = 0;
+  private out = NaN;
+  private readonly fe: FrameEngine;
+  private readonly page: () => number | null;
+
+  constructor(fe: FrameEngine, page: () => number | null) { this.fe = fe; this.page = page; }
+
+  touch(): void {
+    if (this.easing && !Number.isNaN(this.lastIn)) { this.easing = false; this.lead = this.out - this.lastIn; }
+  }
+
+  input(s: number, now: number): void {
+    const page = this.page();
+    const pageMoved = page !== null && !Number.isNaN(this.lastPage) && Math.abs(page - this.lastPage) > 1e-6;
+    this.still = pageMoved ? 0 : this.still + 1;
+    if (page !== null) this.lastPage = page;
+    const ds = Number.isNaN(this.lastIn) ? 0 : s - this.lastIn;
+    this.lastIn = s;
+
+    if (this.easing) {
+      if (!pageMoved) {
+        const u = Math.min(1, (now - this.t0) / this.dur);
+        const v = this.p0 + (this.p1 - this.p0) * (1 - (1 - u) * (1 - u));
+        this.emit(v);
+        if (u >= 1) { this.easing = false; this.holding = true; }
+        return;
+      }
+      this.easing = false;
+      this.lead = this.out - s;
+    }
+    if (this.holding) {
+      if (!pageMoved && page !== null) {
+        if (Math.abs(page - s) < 1e-4) this.holding = false; // the glide has arrived
+        else { this.emit(page); return; }
+      } else { this.holding = false; this.lead = this.out - s; }
+    }
+    if (this.lead !== 0) {
+      const mag = Math.abs(this.lead) - Math.abs(ds) * CATCH_UP;
+      this.lead = mag <= 0 ? 0 : Math.sign(this.lead) * mag;
+      let v = s + this.lead;
+      if (page !== null) v = Math.min(Math.max(v, Math.min(s, page)), Math.max(s, page));
+      this.emit(v);
+      return;
+    }
+    // Following. Has the input just ended with the glide still behind?
+    if (page !== null && this.still >= STILL_TICKS) {
+      const left = page - s;
+      if (Math.abs(left) >= 1 / 30) {
+        this.easing = true;
+        this.p0 = s;
+        this.p1 = page;
+        this.t0 = now;
+        this.dur = Math.min(EASE_MAX_MS, EASE_MIN_MS + Math.abs(left) * EASE_MS_PER_S);
+        this.emit(s);
+        return;
+      }
+    }
+    this.emit(s);
+  }
+
+  private emit(v: number): void { this.out = v; this.fe.setTarget(v); }
+}
+
 /* What the WebGL transitions should sample for the Main Video. */
 export function mainFrameSource(video: HTMLVideoElement): HTMLVideoElement | HTMLCanvasElement {
   return engine ? engine.surface() : video;
@@ -122,9 +221,20 @@ async function activate(video: HTMLVideoElement): Promise<void> {
   const mirror = new MutationObserver(() => { const c = fe.surface(); if (c.style.objectPosition !== video.style.objectPosition) c.style.objectPosition = video.style.objectPosition; });
   mirror.observe(video, { attributes: true, attributeFilter: ['style'] });
 
+  // The page position itself, in seconds of footage, straight from the
+  // engine's scroll read (clamped like its own playhead).
+  const pageSeconds = (): number | null => {
+    const clip = window.ScrollCraft?.instances?.[0]?.clips?.[0];
+    return clip && typeof clip.target === 'number' ? Math.min(Math.max(clip.target, 0), 0.999) * fe.durationSeconds : null;
+  };
+  const ease = new ReleaseEase(fe, pageSeconds);
+  const onTouch = (): void => ease.touch();
+  document.addEventListener('touchstart', onTouch, { passive: true });
+
   let released = false;
   const restore = (reason: string): void => {
     mirror.disconnect();
+    document.removeEventListener('touchstart', onTouch);
     setScrubSink(null);
     engine = null;
     fe.dispose();
@@ -135,14 +245,15 @@ async function activate(video: HTMLVideoElement): Promise<void> {
   };
   fe.onError = restore;
 
-  setScrubSink({ setTarget: (s) => fe.setTarget(s), shownSeconds: () => fe.shownSeconds(), durationSeconds: fe.durationSeconds });
+  const sink = { setTarget: (s: number) => ease.input(s, performance.now()), shownSeconds: () => fe.shownSeconds(), durationSeconds: fe.durationSeconds };
+  setScrubSink(sink);
   // Release the element's media resource and decoder: ScrollCraft keeps
   // driving the playhead (normalised, see scrub-seek.ts) and never reloads.
   video.removeAttribute('src');
   video.load();
   URL.revokeObjectURL(blobUrl);
   released = true;
-  setScrubSink({ setTarget: (s) => fe.setTarget(s), shownSeconds: () => fe.shownSeconds(), durationSeconds: fe.durationSeconds }, true);
+  setScrubSink(sink, true);
   fe.setTarget(seed);
 
   // Read-only diagnostics for verification tooling.
