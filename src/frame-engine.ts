@@ -277,7 +277,19 @@ export class FrameEngine {
       this.restart(from);
       this.feed(from, k - 1);
     }
-    this.schedule();
+    // setTarget runs inside ScrollCraft's rAF callback, so a render scheduled
+    // from here lands one display frame later. Scrolling forward the target
+    // is almost always decoded already (it was prefetched), so it is drawn
+    // now instead; a render still pending for this frame is dropped so the
+    // same vsync never draws twice. Backwards the frames come in bursts of
+    // restarts and would render half now, half a vsync late - an uneven
+    // cadence - so reverse keeps the scheduled render, evenly one vsync late.
+    if (this.dir > 0 && this.frames.has(k)) {
+      if (this.raf) { cancelAnimationFrame(this.raf); this.raf = 0; }
+      this.render();
+    } else {
+      this.schedule();
+    }
   }
 
   /* The element frames are drawn on (it can change once, see render). */
